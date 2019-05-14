@@ -60,10 +60,9 @@ class RealtimeScoring(nanome.PluginInstance):
 
         if self._request_workspace:
             self._request_workspace = False
-            Logs.debug("Requested complex list")
             self.request_complex_list(self.on_complex_list_received_scoring)
         elif self._smina_running:
-            if self.__process.poll() is not None:
+            if self._smina_process.poll() is not None:
                 self.scoring_done()
 
     def on_complex_added(self):
@@ -87,7 +86,6 @@ class RealtimeScoring(nanome.PluginInstance):
         self.request_complex_list(self.on_complex_list_received)
 
     def on_complex_list_received_scoring(self, complex_list):
-        Logs.debug("Received complex list")
         index_list = [self._selected_receptor.complex.index]
         for complex in complex_list:
             if complex.index == self._selected_receptor.complex.index:
@@ -108,7 +106,7 @@ class RealtimeScoring(nanome.PluginInstance):
             lbl.text_value = molecule.molecular.name + " - " + molecule.molecular._associated["> <minimizedAffinity>"]
             self._list.items.append(clone)
 
-        self._plugin.update_menu(self._menu)
+        self.update_menu(self._menu)
 
         os.remove(self._protein_input.name)
         os.remove(self._ligands_input.name)
@@ -119,6 +117,10 @@ class RealtimeScoring(nanome.PluginInstance):
 
     def on_full_complexes_received(self, complex_list):
         receptor = complex_list[0]
+        mat = receptor.transform.get_complex_to_workspace_matrix()
+        for atom in receptor.atoms:
+            atom.molecular.position = mat * atom.molecular.position
+
         site = nanome.structure.Complex()
         site_molecule = nanome.structure.Molecule()
         site_chain = nanome.structure.Chain()
@@ -129,9 +131,11 @@ class RealtimeScoring(nanome.PluginInstance):
         ligands = nanome.structure.Complex()
 
         for complex in complex_list[1:]:
+            mat = complex.transform.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
                 ligands.add_molecule(molecule)
                 for atom in molecule.atoms:
+                    atom.molecular.position = mat * atom.molecular.position
                     site_residue.add_atom(atom)
 
         self._protein_input = tempfile.NamedTemporaryFile(delete=False, suffix=".pdb")
@@ -139,11 +143,8 @@ class RealtimeScoring(nanome.PluginInstance):
         self._site_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligand_output = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
-        nanome.util.Logs.debug("Saved PDB", self._protein_input.name)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
-        nanome.util.Logs.debug("Saved SDF", self._ligands_input.name)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
-        nanome.util.Logs.debug("Saved SDF", self._site_input.name)
 
         smina_args = ['./smina', '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
 
@@ -155,6 +156,9 @@ class RealtimeScoring(nanome.PluginInstance):
         self._smina_running = True
 
     def on_complex_list_received(self, complex_list):
+        if self._is_running:
+            return
+        
         def complex_pressed(button):
             lastSelected = self._selected_receptor
             if lastSelected != None:
