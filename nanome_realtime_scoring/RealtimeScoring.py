@@ -182,8 +182,10 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self.update_menu(self._menu)
 
-
-if __name__ == "__main__":
+def main():
     plugin = nanome.Plugin("Realtime Scoring", "Display realtime scoring information about a selected ligand", "Docking", False)
     plugin.set_plugin_class(RealtimeScoring)
     plugin.run('127.0.0.1', 8888)
+
+if __name__ == "__main__":
+    main()
