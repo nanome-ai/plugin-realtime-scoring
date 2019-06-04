@@ -9,10 +9,10 @@ import tempfile
 from nanome._internal._structure._io._pdb.save import Options as PDBOptions
 from nanome._internal._structure._io._sdf.save import Options as SDFOptions
 
-PDB_OPTIONS = PDBOptions()
-PDB_OPTIONS.write_bonds = True
-SDF_OPTIONS = SDFOptions()
+SDF_OPTIONS = nanome.api.structure.Complex.io.SDFSaveOptions()
 SDF_OPTIONS.write_bonds = True
+PDB_OPTIONS = nanome.api.structure.Complex.io.PDBSaveOptions()
+PDB_OPTIONS.write_bonds = True
 
 
 class RealtimeScoring(nanome.PluginInstance):
@@ -26,8 +26,8 @@ class RealtimeScoring(nanome.PluginInstance):
                     return
                 self.start_scoring()
 
-        menu = nanome.ui.Menu.io.from_json("_scoring_menu.json")
-        nanome.ui.Menu.set_plugin_menu(menu)
+        menu = nanome.ui.Menu.io.from_json(os.path.join(os.path.dirname(__file__), '_scoring_menu.json'))
+        self.menu = menu
 
         self._list = menu.root.find_node("List", True).get_content()
         self._button = menu.root.find_node("Button", True).get_content()
@@ -97,7 +97,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def scoring_done(self):
         self._smina_running = False
 
-        docked_ligands = nanome.structure.Complex.io.from_sdf(self._ligand_output.name)
+        docked_ligands = nanome.structure.Complex.io.from_sdf(path=self._ligand_output.name)
 
         self._list.items = []
         for molecule in docked_ligands.molecules:
@@ -146,7 +146,8 @@ class RealtimeScoring(nanome.PluginInstance):
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
-        smina_args = ['./smina', '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
+        exe_path = os.path.join(os.path.dirname(__file__), 'smina')
+        smina_args = [exe_path, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
 
         try:
             self._smina_process = subprocess.Popen(smina_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

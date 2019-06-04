@@ -2,3 +2,4 @@
 build/
 dist/
 nanome_realtime_scoring.egg-info/
+*.pyc
