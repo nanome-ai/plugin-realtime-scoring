@@ -1,1 +1,1 @@
-smina filter=lfs diff=lfs merge=lfs -text
+dsx/** filter=lfs diff=lfs merge=lfs -text

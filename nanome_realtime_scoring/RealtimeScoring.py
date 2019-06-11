@@ -44,6 +44,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._is_running = False
         self._request_workspace = False
         self._smina_running = False
+        self._dsx_running = False
         self.request_complex_list(self.on_complex_list_received)
 
         menu.enabled = True
@@ -62,8 +63,18 @@ class RealtimeScoring(nanome.PluginInstance):
             self._request_workspace = False
             self.request_complex_list(self.on_complex_list_received_scoring)
         elif self._smina_running:
-            if self._smina_process.poll() is not None:
+            if self._smina_process.poll() is not None and self._obabel_protein_process.poll() is not None and self._obabel_ligands_process.poll() is not None:
                 self.scoring_done()
+        elif self._dsx_running:
+            if self.check_dsx():
+                self.dsx_done()
+
+    def check_dsx(self):
+        poll_result = self._dsx_process.poll()
+        if poll_result is None:
+            output, _ = self._dsx_process.communicate()
+            Logs.message("Output:", output.decode('utf-8').splitlines())
+        return poll_result is not None
 
     def on_complex_added(self):
         self.request_complex_list(self.on_complex_list_received)
@@ -95,8 +106,6 @@ class RealtimeScoring(nanome.PluginInstance):
         self.request_complexes(index_list, self.on_full_complexes_received)
 
     def scoring_done(self):
-        self._smina_running = False
-
         docked_ligands = nanome.structure.Complex.io.from_sdf(path=self._ligand_output.name)
 
         self._list.items = []
@@ -108,11 +117,26 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self.update_menu(self._menu)
 
+        dsx_path = os.path.join(os.path.dirname(__file__), 'dsx/dsx_linux_64.lnx')
+        dsx_args = [dsx_path, '-P', self._protein_converted.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp']
+        try:
+            self._dsx_process = subprocess.Popen(dsx_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except:
+            nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
+            return
+
+        self._smina_running = False
+        self._dsx_running = True
+    
+    def dsx_done(self):
         os.remove(self._protein_input.name)
         os.remove(self._ligands_input.name)
         os.remove(self._site_input.name)
         os.remove(self._ligand_output.name)
+        os.remove(self._protein_converted.name)
+        os.remove(self._ligands_converted.name)
 
+        self._dsx_running = False
         self._request_workspace = True
 
     def on_full_complexes_received(self, complex_list):
@@ -142,17 +166,29 @@ class RealtimeScoring(nanome.PluginInstance):
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._site_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligand_output = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
+        self._protein_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
+        self._ligands_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
+        Logs.debug("Receptor:", self._protein_input.name)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
+        Logs.debug("Ligands:", self._ligands_input.name)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
-        exe_path = os.path.join(os.path.dirname(__file__), 'smina')
-        smina_args = [exe_path, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
+        smina_path = os.path.join(os.path.dirname(__file__), 'smina')
+        smina_args = [smina_path, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
+        obabel_protein_args = ['obabel', '-ipdb', self._protein_input.name, '-omol2', '-O' + self._protein_converted.name]
+        obabel_ligands_args = ['obabel', '-isdf', self._ligands_input.name, '-omol2', '-O' + self._ligands_converted.name]
 
         try:
             self._smina_process = subprocess.Popen(smina_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except:
-            nanome.util.Logs.error("Couldn't execute smina, please check if executable is in the plugin folder and has permissions")
+            nanome.util.Logs.error("Couldn't execute smina, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + smina_path)
+            return
+        try:
+            self._obabel_protein_process = subprocess.Popen(obabel_protein_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self._obabel_ligands_process = subprocess.Popen(obabel_ligands_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except:
+            nanome.util.Logs.error("Couldn't execute obabel, please check if packet 'openbabel' is installed")
             return
         self._smina_running = True
 
