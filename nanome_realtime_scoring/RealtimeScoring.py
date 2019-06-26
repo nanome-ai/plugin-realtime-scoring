@@ -14,6 +14,11 @@ SDF_OPTIONS.write_bonds = True
 PDB_OPTIONS = nanome.api.structure.Complex.io.PDBSaveOptions()
 PDB_OPTIONS.write_bonds = True
 
+MIN_BFACTOR = -1
+MAX_BFACTOR = 1
+
+bfactor_gap = MAX_BFACTOR - MIN_BFACTOR
+
 
 class RealtimeScoring(nanome.PluginInstance):
     def start(self):
@@ -73,8 +78,56 @@ class RealtimeScoring(nanome.PluginInstance):
         poll_result = self._dsx_process.poll()
         if poll_result is None:
             output, _ = self._dsx_process.communicate()
-            Logs.message("Output:", output.decode('utf-8').splitlines())
+            self.parse_scores(output)
         return poll_result is not None
+
+    def parse_scores(self, output):
+        lines = output.splitlines()
+        count = len(lines)
+        i = 0
+    
+        while i < count:
+            if lines[i].startswith("# Receptor-Ligand:"):
+                break
+        if i >= count:
+            Logs.error("Couldn't parse DSX scores")
+            return
+
+        scores = dict()
+        last_tuple = None
+        last_arr = None
+        score_min = None
+        score_max = None
+        while i < count:
+            line = lines[i]
+            if line.startswith("# End of pair potentials"):
+                break
+            line_items = line.split("__")
+            atom_items = line_items[1].split("_")
+            score = line_items[2]
+            tup = (atom_items[1], atom_items[2])
+            if last_tuple != tup:    
+                if tup in scores:
+                    last_arr = score[tup]
+                else:
+                    last_arr = []
+                    score[tup] = last_arr
+            last_tuple = tup
+            last_arr.append(score)
+
+            if score_min == None or score < score_min:
+                score_min = score
+            if score_max == None or score > score_max:
+                score_max = score
+
+        score_gap = score_max - score_min
+        for atom, score_arr in scores.items():
+            score = sum(score_arr) / len(score_arr)
+            bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
+            self._ligands.molecules[atom[0]].atoms[atom[1]].bfactor = bfactor
+        
+        self.update_structures_deep(self._ligands.molecules)
+
 
     def on_complex_added(self):
         self.request_complex_list(self.on_complex_list_received)
@@ -191,6 +244,7 @@ class RealtimeScoring(nanome.PluginInstance):
             nanome.util.Logs.error("Couldn't execute obabel, please check if packet 'openbabel' is installed")
             return
         self._smina_running = True
+        self._ligands = ligands
 
     def on_complex_list_received(self, complex_list):
         if self._is_running:
