@@ -4,6 +4,7 @@ from nanome.util import Logs
 import os
 import subprocess
 import tempfile
+import itertools
 
 # TMP
 from nanome._internal._structure._io._pdb.save import Options as PDBOptions
@@ -14,8 +15,8 @@ SDF_OPTIONS.write_bonds = True
 PDB_OPTIONS = nanome.api.structure.Complex.io.PDBSaveOptions()
 PDB_OPTIONS.write_bonds = True
 
-MIN_BFACTOR = -1
-MAX_BFACTOR = 1
+MIN_BFACTOR = 0
+MAX_BFACTOR = 50
 
 bfactor_gap = MAX_BFACTOR - MIN_BFACTOR
 
@@ -27,7 +28,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 self.stop_scoring()
             else:
                 if self._selected_receptor == None:
-                    self.send_notification(nanome.util.NotificationTypes.error, "Please select a receptor")
+                    self.send_notification(nanome.util.enums.NotificationTypes.error, "Please select a receptor")
                     return
                 self.start_scoring()
 
@@ -89,9 +90,11 @@ class RealtimeScoring(nanome.PluginInstance):
         while i < count:
             if lines[i].startswith("# Receptor-Ligand:"):
                 break
+            i += 1
         if i >= count:
             Logs.error("Couldn't parse DSX scores")
             return
+        i += 1
 
         scores = dict()
         last_tuple = None
@@ -104,14 +107,14 @@ class RealtimeScoring(nanome.PluginInstance):
                 break
             line_items = line.split("__")
             atom_items = line_items[1].split("_")
-            score = line_items[2]
-            tup = (atom_items[1], atom_items[2])
+            score = float(line_items[2])
+            tup = (int(atom_items[1]), int(atom_items[2]))
             if last_tuple != tup:    
                 if tup in scores:
-                    last_arr = score[tup]
+                    last_arr = scores[tup]
                 else:
                     last_arr = []
-                    score[tup] = last_arr
+                    scores[tup] = last_arr
             last_tuple = tup
             last_arr.append(score)
 
@@ -119,15 +122,17 @@ class RealtimeScoring(nanome.PluginInstance):
                 score_min = score
             if score_max == None or score > score_max:
                 score_max = score
+            i += 1
 
         score_gap = score_max - score_min
         for atom, score_arr in scores.items():
             score = sum(score_arr) / len(score_arr)
             bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
-            self._ligands.molecules[atom[0]].atoms[atom[1]].bfactor = bfactor
+            molecule = self._ligands._molecules[atom[0] - 1]
+            atom = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
+            atom.bfactor = bfactor
         
-        self.update_structures_deep(self._ligands.molecules)
-
+        self.update_structures_deep(self._ligands.molecules, self._update_done)
 
     def on_complex_added(self):
         self.request_complex_list(self.on_complex_list_received)
@@ -161,19 +166,23 @@ class RealtimeScoring(nanome.PluginInstance):
     def scoring_done(self):
         docked_ligands = nanome.structure.Complex.io.from_sdf(path=self._ligand_output.name)
 
+        Logs.debug("Scoring done")
         self._list.items = []
         for molecule in docked_ligands.molecules:
             clone = self._score_item_prefab.clone()
             lbl = clone.get_children()[0].get_content()
-            lbl.text_value = molecule.molecular.name + " - " + molecule.molecular._associated["> <minimizedAffinity>"]
+            lbl.text_value = molecule.molecular.name + " - " + molecule._associated["> <minimizedAffinity>"]
             self._list.items.append(clone)
 
         self.update_menu(self._menu)
+        Logs.debug("Starting DSX")
+        Logs.debug("Protein:", self._protein_converted.name)
+        Logs.debug("Ligand:", self._ligands_converted.name)
 
         dsx_path = os.path.join(os.path.dirname(__file__), 'dsx/dsx_linux_64.lnx')
         dsx_args = [dsx_path, '-P', self._protein_converted.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp']
         try:
-            self._dsx_process = subprocess.Popen(dsx_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(os.path.dirname(__file__), 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         except:
             nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
             return
@@ -190,6 +199,8 @@ class RealtimeScoring(nanome.PluginInstance):
         os.remove(self._ligands_converted.name)
 
         self._dsx_running = False
+
+    def _update_done(self):
         self._request_workspace = True
 
     def on_full_complexes_received(self, complex_list):
@@ -210,7 +221,9 @@ class RealtimeScoring(nanome.PluginInstance):
         for complex in complex_list[1:]:
             mat = complex.transform.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
+                index = molecule.index
                 ligands.add_molecule(molecule)
+                molecule.index = index
                 for atom in molecule.atoms:
                     atom.molecular.position = mat * atom.molecular.position
                     site_residue.add_atom(atom)
