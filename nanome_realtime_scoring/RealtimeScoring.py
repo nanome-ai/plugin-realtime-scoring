@@ -130,9 +130,14 @@ class RealtimeScoring(nanome.PluginInstance):
             bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
             molecule = self._ligands._molecules[atom[0] - 1]
             atom = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
-            atom.bfactor = bfactor
+            atom._bfactor = bfactor
         
-        self.update_structures_deep(self._ligands.molecules, self._update_done)
+        for complex in self._to_update:
+            mat = complex.transform.get_workspace_to_complex_matrix()
+            for atom in complex.atoms:
+                atom.molecular.position = mat * atom.molecular.position
+
+        self.update_structures_deep(self._to_update, self._update_done)
 
     def on_complex_added(self):
         self.request_complex_list(self.on_complex_list_received)
@@ -218,7 +223,9 @@ class RealtimeScoring(nanome.PluginInstance):
         site_chain.add_residue(site_residue)
         ligands = nanome.structure.Complex()
 
-        for complex in complex_list[1:]:
+        self._to_update = complex_list[1:]
+
+        for complex in self._to_update:
             mat = complex.transform.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
                 index = molecule.index
@@ -226,7 +233,9 @@ class RealtimeScoring(nanome.PluginInstance):
                 molecule.index = index
                 for atom in molecule.atoms:
                     atom.molecular.position = mat * atom.molecular.position
+                    index = atom.index
                     site_residue.add_atom(atom)
+                    atom.index = index
 
         self._protein_input = tempfile.NamedTemporaryFile(delete=False, suffix=".pdb")
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
