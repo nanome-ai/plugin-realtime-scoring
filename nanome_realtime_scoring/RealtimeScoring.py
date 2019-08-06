@@ -86,7 +86,7 @@ class RealtimeScoring(nanome.PluginInstance):
         lines = output.splitlines()
         count = len(lines)
         i = 0
-    
+
         while i < count:
             if lines[i].startswith("# Receptor-Ligand:"):
                 break
@@ -129,15 +129,27 @@ class RealtimeScoring(nanome.PluginInstance):
             score = sum(score_arr) / len(score_arr)
             bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
             molecule = self._ligands._molecules[atom[0] - 1]
-            atom = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
-            atom._bfactor = bfactor
-        
-        for complex in self._to_update:
-            mat = complex.transform.get_workspace_to_complex_matrix()
-            for atom in complex.atoms:
-                atom.molecular.position = mat * atom.molecular.position
+            atom_data = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
+            atom_data._bfactor = bfactor
 
-        self.update_structures_deep(self._to_update, self._update_done)
+        colors = []
+        scales = []
+        bfactor_mid = (MAX_BFACTOR - MIN_BFACTOR) / 2
+        bfactor_half = MAX_BFACTOR - bfactor_mid
+        for atom in self._ligands.atoms:
+            colors.append(int(255 * ((atom._bfactor - MIN_BFACTOR) / bfactor_gap)))
+            colors.append(255 - int(255 * ((atom._bfactor - MIN_BFACTOR) / bfactor_gap)))
+            colors.append(0)
+            scales.append((abs(bfactor_mid - atom._bfactor) / bfactor_half) * 1.0 + 0.1)
+
+        self._streams_updated = 0
+        self._color_stream.update(colors, self.on_stream_update_done)
+        self._scale_stream.update(scales, self.on_stream_update_done)
+
+    def on_stream_update_done(self):
+        self._streams_updated += 1
+        if self._streams_updated >= 2:
+            self._update_done()
 
     def on_complex_added(self):
         self.request_complex_list(self.on_complex_list_received)
@@ -151,6 +163,8 @@ class RealtimeScoring(nanome.PluginInstance):
         self._button.set_all_text("Stop scoring")
         self.update_content(self._button)
         self._request_workspace = True
+        self._color_stream = None
+        self._scale_stream = None
 
     def stop_scoring(self):
         self._is_running = False
@@ -209,6 +223,33 @@ class RealtimeScoring(nanome.PluginInstance):
         self._request_workspace = True
 
     def on_full_complexes_received(self, complex_list):
+        if self._color_stream == None or self._scale_stream == None:
+            indices = []
+            for complex in complex_list[1:]:
+                for atom in complex.atoms:
+                    indices.append(atom.index)
+                    atom.atom_mode = nanome.api.structure.Atom.AtomMode.point
+            def on_color_stream_ready(stream, error):
+                self._color_stream = stream
+                self.on_stream_ready(complex_list)
+            def on_scale_stream_ready(stream, error):
+                self._scale_stream = stream
+                self.on_stream_ready(complex_list)
+            def on_update_structure_done():
+                self._struct_updated = True
+                self.on_stream_ready(complex_list)
+            self._struct_updated = False
+            self.create_atom_stream(indices, nanome.api.streams.Stream.Type.color, on_color_stream_ready)
+            self.create_atom_stream(indices, nanome.api.streams.Stream.Type.scale, on_scale_stream_ready)
+            self.update_structures_deep(complex_list[1:], on_update_structure_done)
+        else:
+            self.process_complex_list(complex_list)
+
+    def on_stream_ready(self, complex_list):
+        if self._color_stream != None and self._scale_stream != None and self._struct_updated == True:
+            self.process_complex_list(complex_list)
+
+    def process_complex_list(self, complex_list):
         receptor = complex_list[0]
         mat = receptor.transform.get_complex_to_workspace_matrix()
         for atom in receptor.atoms:
@@ -223,9 +264,7 @@ class RealtimeScoring(nanome.PluginInstance):
         site_chain.add_residue(site_residue)
         ligands = nanome.structure.Complex()
 
-        self._to_update = complex_list[1:]
-
-        for complex in self._to_update:
+        for complex in complex_list[1:]:
             mat = complex.transform.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
                 index = molecule.index
