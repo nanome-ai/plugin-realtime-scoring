@@ -1,5 +1,6 @@
 import nanome
 from nanome.util import Logs
+from nanome.util.enums import NotificationTypes
 
 import os
 import subprocess
@@ -28,7 +29,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 self.stop_scoring()
             else:
                 if self._selected_receptor == None:
-                    self.send_notification(nanome.util.enums.NotificationTypes.error, "Please select a receptor")
+                    self.send_notification(NotificationTypes.error, "Please select a receptor")
                     return
                 self.start_scoring()
 
@@ -190,7 +191,7 @@ class RealtimeScoring(nanome.PluginInstance):
         for molecule in docked_ligands.molecules:
             clone = self._score_item_prefab.clone()
             lbl = clone.get_children()[0].get_content()
-            lbl.text_value = molecule.molecular.name + " - " + molecule._associated["> <minimizedAffinity>"]
+            lbl.text_value = molecule.name + " - " + molecule._associated["> <minimizedAffinity>"]
             self._list.items.append(clone)
 
         self.update_menu(self._menu)
@@ -251,9 +252,9 @@ class RealtimeScoring(nanome.PluginInstance):
 
     def process_complex_list(self, complex_list):
         receptor = complex_list[0]
-        mat = receptor.transform.get_complex_to_workspace_matrix()
+        mat = receptor.get_complex_to_workspace_matrix()
         for atom in receptor.atoms:
-            atom.molecular.position = mat * atom.molecular.position
+            atom.position = mat * atom.position
 
         site = nanome.structure.Complex()
         site_molecule = nanome.structure.Molecule()
@@ -265,13 +266,13 @@ class RealtimeScoring(nanome.PluginInstance):
         ligands = nanome.structure.Complex()
 
         for complex in complex_list[1:]:
-            mat = complex.transform.get_complex_to_workspace_matrix()
+            mat = complex.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
                 index = molecule.index
                 ligands.add_molecule(molecule)
                 molecule.index = index
                 for atom in molecule.atoms:
-                    atom.molecular.position = mat * atom.molecular.position
+                    atom.position = mat * atom.position
                     index = atom.index
                     site_residue.add_atom(atom)
                     atom.index = index
@@ -327,7 +328,7 @@ class RealtimeScoring(nanome.PluginInstance):
             clone = self._complex_item_prefab.clone()
             ln_btn = clone.get_children()[0]
             btn = ln_btn.get_content()
-            btn.set_all_text(complex.molecular.name)
+            btn.set_all_text(complex.name)
             btn.complex = complex
             btn.register_pressed_callback(complex_pressed)
             self._list.items.append(clone)
