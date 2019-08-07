@@ -228,7 +228,7 @@ class RealtimeScoring(nanome.PluginInstance):
             for complex in complex_list[1:]:
                 for atom in complex.atoms:
                     indices.append(atom.index)
-                    atom.atom_mode = nanome.api.structure.Atom.AtomMode.point
+                    atom.atom_mode = nanome.api.structure.Atom.AtomRenderingMode.Point
             def on_color_stream_ready(stream, error):
                 self._color_stream = stream
                 self.on_stream_ready(complex_list)
