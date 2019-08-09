@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 import itertools
+import stat
 
 # TMP
 from nanome._internal._structure._io._pdb.save import Options as PDBOptions
@@ -20,6 +21,14 @@ MIN_BFACTOR = 0
 MAX_BFACTOR = 50
 
 bfactor_gap = MAX_BFACTOR - MIN_BFACTOR
+bfactor_mid = bfactor_gap / 2
+bfactor_half = MAX_BFACTOR - bfactor_mid
+
+SMINA_PATH = os.path.join(os.path.dirname(__file__), 'smina')
+try:
+    os.chmod(SMINA_PATH, stat.S_IXGRP | stat.S_IEXEC)
+except:
+    pass
 
 
 class RealtimeScoring(nanome.PluginInstance):
@@ -97,6 +106,11 @@ class RealtimeScoring(nanome.PluginInstance):
             return
         i += 1
 
+        if i >= count:
+            self.send_notification(NotificationTypes.error, "Please select a receptor")
+            self.stop_scoring()
+            return
+
         scores = dict()
         last_tuple = None
         last_arr = None
@@ -125,18 +139,20 @@ class RealtimeScoring(nanome.PluginInstance):
                 score_max = score
             i += 1
 
-        score_gap = score_max - score_min
-        for atom, score_arr in scores.items():
-            score = sum(score_arr) / len(score_arr)
-            bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
-            molecule = self._ligands._molecules[atom[0] - 1]
-            atom_data = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
-            atom_data._bfactor = bfactor
+        if score_min != None and score_max != None:
+            score_gap = max(score_max - score_min, 0.01)
+            for atom, score_arr in scores.items():
+                score = sum(score_arr) / len(score_arr)
+                bfactor = ((score - score_min) / score_gap) * bfactor_gap + MIN_BFACTOR
+                molecule = self._ligands._molecules[atom[0] - 1]
+                atom_data = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
+                atom_data._bfactor = bfactor
+        else:
+            for atom in self._ligands.atoms:
+                atom._bfactor = bfactor_mid
 
         colors = []
         scales = []
-        bfactor_mid = (MAX_BFACTOR - MIN_BFACTOR) / 2
-        bfactor_half = MAX_BFACTOR - bfactor_mid
         for atom in self._ligands.atoms:
             colors.append(int(255 * ((atom._bfactor - MIN_BFACTOR) / bfactor_gap)))
             colors.append(255 - int(255 * ((atom._bfactor - MIN_BFACTOR) / bfactor_gap)))
@@ -289,8 +305,7 @@ class RealtimeScoring(nanome.PluginInstance):
         Logs.debug("Ligands:", self._ligands_input.name)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
-        smina_path = os.path.join(os.path.dirname(__file__), 'smina')
-        smina_args = [smina_path, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
+        smina_args = [SMINA_PATH, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
         obabel_protein_args = ['obabel', '-ipdb', self._protein_input.name, '-omol2', '-O' + self._protein_converted.name]
         obabel_ligands_args = ['obabel', '-isdf', self._ligands_input.name, '-omol2', '-O' + self._ligands_converted.name]
 
