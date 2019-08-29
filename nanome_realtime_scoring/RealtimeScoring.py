@@ -15,6 +15,11 @@ SDF_OPTIONS.write_bonds = True
 PDB_OPTIONS = nanome.api.structure.Complex.io.PDBSaveOptions()
 PDB_OPTIONS.write_bonds = True
 
+SMINA_PATH = os.path.join(os.path.dirname(__file__), 'smina')
+try:
+    os.chmod(SMINA_PATH, 0o777)
+except:
+    pass
 
 class RealtimeScoring(nanome.PluginInstance):
     def start(self):
@@ -147,8 +152,7 @@ class RealtimeScoring(nanome.PluginInstance):
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
-        exe_path = os.path.join(os.path.dirname(__file__), 'smina')
-        smina_args = [exe_path, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
+        smina_args = [SMINA_PATH, '--autobox_ligand', self._site_input.name, '--score_only', '-r', self._protein_input.name, '--ligand', self._ligands_input.name, '--out', self._ligand_output.name]
 
         try:
             self._smina_process = subprocess.Popen(smina_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
