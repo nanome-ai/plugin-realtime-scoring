@@ -93,15 +93,15 @@ class RealtimeScoring(nanome.PluginInstance):
             return
 
         if self._obabel_running: 
-            if self._obabel_ligands_process.poll() is not None:
+            if self._obabel_process.poll() is not None:
                 self.benchmark_stop("obabel")
                 self._obabel_running = False
                 self.dsx_start()
+                self.get_updated_complexes()
 
         elif self._dsx_running:
             if self._dsx_process.poll() is not None:
                 self._dsx_running = False
-                self.get_updated_complexes()
                 
                 output, _ = self._dsx_process.communicate()
                 self.parse_scores(output)
@@ -164,6 +164,9 @@ class RealtimeScoring(nanome.PluginInstance):
                 for atom in complex.atoms:
                     indices.append(atom.index)
                     atom.atom_mode = nanome.api.structure.Atom.AtomRenderingMode.Point
+            def on_stream_ready(self, complex_list):
+                if self._color_stream != None and self._scale_stream != None and self._struct_updated == True:
+                    self.prepare_complexes(complex_list)
             def on_color_stream_ready(stream, error):
                 self._color_stream = stream
                 self.on_stream_ready(complex_list)
@@ -178,13 +181,9 @@ class RealtimeScoring(nanome.PluginInstance):
             self.create_atom_stream(indices, nanome.api.streams.Stream.Type.scale, on_scale_stream_ready)
             self.update_structures_deep(complex_list[1:], on_update_structure_done)
         else:
-            self.obabel_start(complex_list)
+            self.prepare_complexes(complex_list)
 
-    def on_stream_ready(self, complex_list):
-        if self._color_stream != None and self._scale_stream != None and self._struct_updated == True:
-            self.obabel_start(complex_list)
-
-    def obabel_start(self, complex_list):
+    def prepare_complexes(self, complex_list):
         receptor = complex_list[0]
         mat = receptor.get_complex_to_workspace_matrix()
         for atom in receptor.atoms:
@@ -198,6 +197,7 @@ class RealtimeScoring(nanome.PluginInstance):
         site_molecule.add_chain(site_chain)
         site_chain.add_residue(site_residue)
         ligands = nanome.structure.Complex()
+        self._ligands = ligands
 
         for complex in complex_list[1:]:
             mat = complex.get_complex_to_workspace_matrix()
@@ -212,27 +212,22 @@ class RealtimeScoring(nanome.PluginInstance):
                     atom.index = index
 
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
-        Logs.debug("Receptor:", self._protein_input.name)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
-        Logs.debug("Ligands:", self._ligands_input.name)
         site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
-        obabel_ligands_args = ['obabel', '-isdf', self._ligands_input.name, '-omol2', '-O' + self._ligands_converted.name]
+        self.obabel_start()
 
+    def obabel_start(self):
+        obabel_args = ['obabel', '-isdf', self._ligands_input.name, '-omol2', '-O' + self._ligands_converted.name]
         try:
+            self._obabel_process = subprocess.Popen(obabel_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self._obabel_running = True
-            self._obabel_ligands_process = subprocess.Popen(obabel_ligands_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.benchmark_start("obabel")
         except:
             nanome.util.Logs.error("Couldn't execute obabel, please check if packet 'openbabel' is installed")
             return
-        self._ligands = ligands
     
     def dsx_start(self):
-        Logs.debug("Starting DSX")
-        Logs.debug("Protein:", self._protein_input.name)
-        Logs.debug("Ligand:", self._ligands_converted.name)
-
         dsx_path = os.path.join(DIR, 'dsx/dsx_linux_64.lnx')
         dsx_args = [dsx_path, '-P', self._protein_input.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp', '-F', 'results.txt']
         try:
