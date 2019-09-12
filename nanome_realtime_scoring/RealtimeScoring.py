@@ -164,18 +164,18 @@ class RealtimeScoring(nanome.PluginInstance):
                 for atom in complex.atoms:
                     indices.append(atom.index)
                     atom.atom_mode = nanome.api.structure.Atom.AtomRenderingMode.Point
-            def on_stream_ready(self, complex_list):
+            def on_stream_ready(complex_list):
                 if self._color_stream != None and self._scale_stream != None and self._struct_updated == True:
                     self.prepare_complexes(complex_list)
             def on_color_stream_ready(stream, error):
                 self._color_stream = stream
-                self.on_stream_ready(complex_list)
+                on_stream_ready(complex_list)
             def on_scale_stream_ready(stream, error):
                 self._scale_stream = stream
-                self.on_stream_ready(complex_list)
+                on_stream_ready(complex_list)
             def on_update_structure_done():
                 self._struct_updated = True
-                self.on_stream_ready(complex_list)
+                on_stream_ready(complex_list)
             self._struct_updated = False
             self.create_atom_stream(indices, nanome.api.streams.Stream.Type.color, on_color_stream_ready)
             self.create_atom_stream(indices, nanome.api.streams.Stream.Type.scale, on_scale_stream_ready)
