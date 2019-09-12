@@ -30,16 +30,24 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 class RealtimeScoring(nanome.PluginInstance):
     def benchmark_start(self, fn_name):
-        self._benchmarks[fn_name] = timer()
+        if not fn_name in self._benchmarks:
+            self._benchmarks[fn_name] = [0, 0, 0]
+        self._benchmarks[fn_name][0] = timer()
     
     def benchmark_stop(self, fn_name):
-        print('%s : %f' % (fn_name, timer() - self._benchmarks[fn_name]))
+        entry = self._benchmarks[fn_name]
+        time = timer() - entry[0]
+        entry[1] += time
+        entry[2] += 1
+        avg = entry[1] / entry[2]
+
+        print('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
 
     def start(self):
         self._benchmarks = {}
+
         self._protein_input = tempfile.NamedTemporaryFile(delete=False, suffix=".pdb")
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
-        self._site_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligands_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
 
         def button_pressed(button):
@@ -70,8 +78,9 @@ class RealtimeScoring(nanome.PluginInstance):
         self._dsx_running = False
         self._ligands = None
 
-        self._selected_receptor = None
-        self._selected_ligands = []
+        self._receptor_index = None
+        self._ligand_indices = []
+        self._complexes = []
 
         menu.enabled = True
         self.update_menu(menu)
@@ -85,7 +94,6 @@ class RealtimeScoring(nanome.PluginInstance):
     def on_stop(self):
         os.remove(self._protein_input.name)
         os.remove(self._ligands_input.name)
-        os.remove(self._site_input.name)
         os.remove(self._ligands_converted.name)
 
     def update(self):
@@ -97,12 +105,13 @@ class RealtimeScoring(nanome.PluginInstance):
                 self.benchmark_stop("obabel")
                 self._obabel_running = False
                 self.dsx_start()
-                self.get_updated_complexes()
 
         elif self._dsx_running:
             if self._dsx_process.poll() is not None:
+                self.benchmark_stop("dsx")
                 self._dsx_running = False
                 
+                self.get_updated_complexes()
                 output, _ = self._dsx_process.communicate()
                 self.parse_scores(output)
                 self.display_results()
@@ -114,15 +123,17 @@ class RealtimeScoring(nanome.PluginInstance):
         self.request_complex_list(self.update_lists)
 
     def start_scoring(self):
-        if self._selected_receptor is None:
+        if self._receptor_index is None:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
             return
             
-        if len(self._selected_ligands) == 0:
+        if len(self._ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
             
         self._is_running = True
+        self._obabel_running = False
+        self._dsx_running = False
 
         self._btn_score.set_all_text("Stop scoring")
         self._p_selection.enabled = False
@@ -132,8 +143,8 @@ class RealtimeScoring(nanome.PluginInstance):
         self._color_stream = None
         self._scale_stream = None
         
-        self.benchmark_start("scoring_loop")
-        self.get_updated_complexes()
+        self.benchmark_start("total")
+        self.get_full_complexes()
 
     def stop_scoring(self):
         self._is_running = False
@@ -145,28 +156,57 @@ class RealtimeScoring(nanome.PluginInstance):
         self._p_results.enabled = False
         self.update_menu(self.menu)
 
+        # for complex in self._complexes[1:]:
+        #     for atom in complex.atoms:
+        #         atom.atom_mode = atom._old_atom_mode
+        # self.update_structures_deep(self._complexes[1:])
+
         self.request_complex_list(self.update_lists)
 
-    def get_updated_complexes(self):
-        self.benchmark_stop("scoring_loop")
-        print('*' * 32)
-        self.benchmark_start("scoring_loop")
+    def get_full_complexes(self):
+        def set_complexes(complex_list):
+            self._complexes = complex_list
 
-        index_list = [self._selected_receptor] + self._selected_ligands
-        self.benchmark_start("get_full_complexes")
-        self.request_complexes(index_list, self.setup_streams)
+            for complex in complex_list:
+                for atom in complex.atoms:
+                    atom._old_position = atom.position
+
+            self.setup_streams(complex_list)
+
+        index_list = [self._receptor_index] + self._ligand_indices
+        self.request_complexes(index_list, set_complexes)
+
+    def get_updated_complexes(self):
+        self.benchmark_stop("total")
+        print('*' * 32)
+        self.benchmark_start("total")
+    
+        def update_complexes(complex_list):
+            # update self._complexes positions from shallow list
+            for complex in self._complexes:
+                for thing in complex_list:
+                    if thing.index == complex.index:
+                        complex.position = thing.position
+                        complex.rotation = thing.rotation
+                        break
+
+            self.benchmark_stop("update")
+            self.prepare_complexes(self._complexes)
+        
+        self.benchmark_start("update")
+        self.request_complex_list(update_complexes)
 
     def setup_streams(self, complex_list):
-        self.benchmark_stop("get_full_complexes")
         if self._color_stream == None or self._scale_stream == None:
             indices = []
             for complex in complex_list[1:]:
                 for atom in complex.atoms:
                     indices.append(atom.index)
+                    # atom._old_atom_mode = atom.atom_mode
                     atom.atom_mode = nanome.api.structure.Atom.AtomRenderingMode.Point
             def on_stream_ready(complex_list):
                 if self._color_stream != None and self._scale_stream != None and self._struct_updated == True:
-                    self.prepare_complexes(complex_list)
+                    self.get_updated_complexes()
             def on_color_stream_ready(stream, error):
                 self._color_stream = stream
                 on_stream_ready(complex_list)
@@ -181,39 +221,26 @@ class RealtimeScoring(nanome.PluginInstance):
             self.create_atom_stream(indices, nanome.api.streams.Stream.Type.scale, on_scale_stream_ready)
             self.update_structures_deep(complex_list[1:], on_update_structure_done)
         else:
-            self.prepare_complexes(complex_list)
+            self.get_updated_complexes()
 
     def prepare_complexes(self, complex_list):
         receptor = complex_list[0]
-        mat = receptor.get_complex_to_workspace_matrix()
-        for atom in receptor.atoms:
-            atom.position = mat * atom.position
+        for complex in complex_list:
+            mat = complex.get_complex_to_workspace_matrix()
+            for atom in complex.atoms:
+                atom.position = mat * atom._old_position
 
-        site = nanome.structure.Complex()
-        site_molecule = nanome.structure.Molecule()
-        site_chain = nanome.structure.Chain()
-        site_residue = nanome.structure.Residue()
-        site.add_molecule(site_molecule)
-        site_molecule.add_chain(site_chain)
-        site_chain.add_residue(site_residue)
         ligands = nanome.structure.Complex()
         self._ligands = ligands
 
         for complex in complex_list[1:]:
-            mat = complex.get_complex_to_workspace_matrix()
             for molecule in complex.molecules:
                 index = molecule.index
                 ligands.add_molecule(molecule)
                 molecule.index = index
-                for atom in molecule.atoms:
-                    atom.position = mat * atom.position
-                    index = atom.index
-                    site_residue.add_atom(atom)
-                    atom.index = index
-
+                
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
-        site.io.to_sdf(self._site_input.name, SDF_OPTIONS)
 
         self.obabel_start()
 
@@ -233,6 +260,7 @@ class RealtimeScoring(nanome.PluginInstance):
         try:
             self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             self._dsx_running = True
+            self.benchmark_start("dsx")
         except:
             nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
             return
@@ -329,7 +357,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 result = results[i].split('|')
                 name = result[1].strip()
                 score = result[5].strip()
-                scores.append('%s - %s' % (name, score))
+                scores.append('%s: %s' % (name, score))
                 i += 1
         
         self._ls_results.items = []
@@ -345,18 +373,18 @@ class RealtimeScoring(nanome.PluginInstance):
             return
 
         def update_selected_ligands():
-            self._selected_ligands = []
+            self._ligand_indices = []
             for item in self._ls_ligands.items:
                 btn = item.get_content()
                 if btn.selected:
-                    self._selected_ligands.append(btn.index)
+                    self._ligand_indices.append(btn.index)
 
         def receptor_pressed(receptor):
             for item in self._ls_receptors.items:
                 item.get_content().selected = False
 
             receptor.selected = True
-            self._selected_receptor = receptor.index
+            self._receptor_index = receptor.index
 
             for item in self._ls_ligands.items:
                 ligand = item.get_content()
@@ -383,8 +411,8 @@ class RealtimeScoring(nanome.PluginInstance):
                 ls.items.append(clone)
             self.update_content(ls)
 
-        self._selected_receptor = None
-        self._selected_ligands = []
+        self._receptor_index = None
+        self._ligand_indices = []
         populate_list(self._ls_receptors, receptor_pressed)
         populate_list(self._ls_ligands, ligand_pressed)
 
