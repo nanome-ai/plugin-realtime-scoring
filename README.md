@@ -21,7 +21,7 @@ $ nanome-realtime-scoring -a plugin_server_address
 In Nanome:
 
 - Activate Plugin
-- In the plugin window, select a receptor, and start scoring
+- In the plugin window, select a receptor and ligands, then start scoring
 - Plugin will display a list of all other complexes, with their docking score
 - Moving a complex around will update its score
 
