@@ -417,7 +417,7 @@ class RealtimeScoring(nanome.PluginInstance):
         populate_list(self._ls_ligands, ligand_pressed)
 
 def main():
-    plugin = nanome.Plugin("RTS II", "(Development Version) Display realtime scoring information about a selected ligand", "Docking", False)
+    plugin = nanome.Plugin("Realtime Scoring", "Display realtime scoring information about a selected ligand", "Docking", False)
     plugin.set_plugin_class(RealtimeScoring)
     plugin.run('127.0.0.1', 8888)
 
