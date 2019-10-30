@@ -183,7 +183,6 @@ class RealtimeScoring(nanome.PluginInstance):
                 complex = complex_list[complex_i].convert_to_frames()
                 complex.index = complex_list[complex_i].index
                 complex_list[complex_i] = complex
-                print("complex i:", complex_i)
                 for atom in complex.atoms:
                     atom._old_position = atom.position
                     if complex_i > 0:
