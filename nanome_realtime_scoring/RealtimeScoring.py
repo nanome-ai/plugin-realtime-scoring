@@ -283,7 +283,7 @@ class RealtimeScoring(nanome.PluginInstance):
         line_index = 0
         def find_next_ligand():
             nonlocal line_index
-            while line_index < number_of_lines:
+            while line_index < number_of_lines - 1:
                 if lines[line_index].startswith("# Receptor-Ligand:"):
                     line_index += 1
                     return True
@@ -303,7 +303,7 @@ class RealtimeScoring(nanome.PluginInstance):
             score_min = None
             score_max = None
             
-            while line_index < number_of_lines:
+            while line_index < number_of_lines - 1:
                 line = lines[line_index]
                 if line.startswith("# End of pair potentials"):
                     has_next_ligand = find_next_ligand()
@@ -333,7 +333,6 @@ class RealtimeScoring(nanome.PluginInstance):
             score_gap = max(score_max - score_min, 0.01)
             try:
                 for atom_tuple, score_arr in scores.items():
-                    number_of_lines += 1
                     score = sum(score_arr) / len(score_arr)
                     bfactor = ((score - score_min) / score_gap) * BFACTOR_GAP + BFACTOR_MIN
                     bfactor_two = score / (-score_min if score < 0 else score_max)
@@ -392,16 +391,16 @@ class RealtimeScoring(nanome.PluginInstance):
         with open(RESULTS_PATH) as results_file:
             results = results_file.readlines()
             number_of_lines = len(results)
-            line_index = results.index('@RESULTS\n') + 4
+            res_line_i = results.index('@RESULTS\n') + 4
 
-            while line_index < number_of_lines:
-                if results[line_index] == '\n':
+            while res_line_i < number_of_lines:
+                if results[res_line_i] == '\n':
                     break
-                result = results[line_index].split('|')
+                result = results[res_line_i].split('|')
                 name = result[1].strip()
                 score = result[5].strip()
                 scores.append('%s: %s' % (name, score))
-                line_index += 1
+                res_line_i += 1
         
         self._ls_results.items = []
         for score in scores:
