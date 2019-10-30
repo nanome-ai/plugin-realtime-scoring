@@ -3,6 +3,7 @@ from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 
 import os
+import functools
 import subprocess
 import tempfile
 import itertools
@@ -41,7 +42,7 @@ class RealtimeScoring(nanome.PluginInstance):
         entry[2] += 1
         avg = entry[1] / entry[2]
 
-        print('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
+        nanome.util.Logs.debug('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
 
     def start(self):
         self._benchmarks = {}
@@ -96,6 +97,18 @@ class RealtimeScoring(nanome.PluginInstance):
         os.remove(self._ligands_input.name)
         os.remove(self._ligands_converted.name)
 
+    def dsx_start(self):
+        dsx_path = os.path.join(DIR, 'dsx', 'dsx_linux_64.lnx')
+        dsx_args = [dsx_path, '-P', self._protein_input.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp', '-F', 'results.txt', '-v']
+        try:
+            self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            self._dsx_running = True
+            nanome.util.Logs.debug("dsx running: " + str(self._dsx_running))
+            self.benchmark_start("dsx")
+        except:
+            nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
+            return
+
     def update(self):
         if not self._is_running:
             return
@@ -105,15 +118,14 @@ class RealtimeScoring(nanome.PluginInstance):
                 self.benchmark_stop("obabel")
                 self._obabel_running = False
                 self.dsx_start()
-
         elif self._dsx_running:
             if self._dsx_process.poll() is not None:
                 self.benchmark_stop("dsx")
                 self._dsx_running = False
                 
                 self.get_updated_complexes()
-                output, _ = self._dsx_process.communicate()
-                self.parse_scores(output)
+                dsx_output, _ = self._dsx_process.communicate()
+                self.parse_scores(dsx_output)
                 self.display_results()
     
     def on_complex_added(self):
@@ -167,18 +179,20 @@ class RealtimeScoring(nanome.PluginInstance):
         def set_complexes(complex_list):
             self._complexes = complex_list
 
-            for complex in complex_list:
+            for line_index in range(0, len(complex_list)):
+                complex = complex_list[line_index].convert_to_frames()
+                complex.index = complex_list[line_index].index
+                complex_list[line_index] = complex
                 for atom in complex.atoms:
                     atom._old_position = atom.position
-
-            self.setup_streams(complex_list)
-
+            self.update_structures_deep(complex_list[1:], functools.partial(self.request_complexes, index_list, self.setup_streams))
+        
         index_list = [self._receptor_index] + self._ligand_indices
         self.request_complexes(index_list, set_complexes)
 
     def get_updated_complexes(self):
         self.benchmark_stop("total")
-        print('*' * 32)
+        nanome.util.Logs.debug('*' * 32)
         self.benchmark_start("total")
     
         def update_complexes(complex_list):
@@ -234,11 +248,12 @@ class RealtimeScoring(nanome.PluginInstance):
         self._ligands = ligands
 
         for complex in complex_list[1:]:
+            complex = complex.convert_to_frames()
             for molecule in complex.molecules:
                 index = molecule.index
                 ligands.add_molecule(molecule)
                 molecule.index = index
-                
+        
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
 
@@ -253,30 +268,22 @@ class RealtimeScoring(nanome.PluginInstance):
         except:
             nanome.util.Logs.error("Couldn't execute obabel, please check if packet 'openbabel' is installed")
             return
-    
-    def dsx_start(self):
-        dsx_path = os.path.join(DIR, 'dsx/dsx_linux_64.lnx')
-        dsx_args = [dsx_path, '-P', self._protein_input.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp', '-F', 'results.txt']
-        try:
-            self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-            self._dsx_running = True
-            self.benchmark_start("dsx")
-        except:
-            nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
-            return
 
-    def parse_scores(self, output):
-        lines = output.splitlines()
-        count = len(lines)
-        i = 0
+    def parse_scores(self, dsx_output):
+        with open(os.path.join(DIR, 'dsx_output.txt'), 'w') as dsx_score_file:
+            dsx_score_file.write(dsx_output)
 
+        lines = dsx_output.splitlines()
+        number_of_lines = len(lines)
+        
+        line_index = 0
         def find_next_ligand():
-            nonlocal i
-            while i < count:
-                if lines[i].startswith("# Receptor-Ligand:"):
-                    i += 1
+            nonlocal line_index
+            while line_index < number_of_lines:
+                if lines[line_index].startswith("# Receptor-Ligand:"):
+                    line_index += 1
                     return True
-                i += 1
+                line_index += 1
             return False
         
         if not find_next_ligand():
@@ -292,73 +299,105 @@ class RealtimeScoring(nanome.PluginInstance):
             score_min = None
             score_max = None
             
-            while i < count:
-                line = lines[i]
+            while line_index < number_of_lines:
+                line = lines[line_index]
                 if line.startswith("# End of pair potentials"):
                     has_next_ligand = find_next_ligand()
                     break
-
                 line_items = line.split("__")
                 atom_items = line_items[1].split("_")
                 score = float(line_items[2])
-                tup = (int(atom_items[1]), int(atom_items[2]))
+                ireceptor_iligand = (int(atom_items[1]), int(atom_items[2]))
                 
-                if last_tuple != tup:    
-                    if tup in scores:
-                        last_arr = scores[tup]
+                if last_tuple != ireceptor_iligand:    
+                    if ireceptor_iligand in scores:
+                        last_arr = scores[ireceptor_iligand]
                     else:
                         last_arr = []
-                        scores[tup] = last_arr
-                last_tuple = tup
+                        scores[ireceptor_iligand] = last_arr
+                last_tuple = ireceptor_iligand
                 last_arr.append(score)
 
                 if score_min == None or score < score_min:
                     score_min = score
                 if score_max == None or score > score_max:
                     score_max = score
-                i += 1
-
-            if score_min != None and score_max != None:
-                score_gap = max(score_max - score_min, 0.01)
-                for atom, score_arr in scores.items():
+                line_index += 1
+            
+            if score_max is None or score_min is None:
+                continue
+            score_gap = max(score_max - score_min, 0.01)
+            try:
+                for atom_tuple, score_arr in scores.items():
+                    number_of_lines += 1
                     score = sum(score_arr) / len(score_arr)
                     bfactor = ((score - score_min) / score_gap) * BFACTOR_GAP + BFACTOR_MIN
-                    molecule = self._ligands._molecules[atom[0] - 1 + ligand_index]
-                    atom_data = next(itertools.islice(molecule.atoms, atom[1] - 1, atom[1]))
-                    atom_data._bfactor = bfactor
-            else:
-                for atom in self._ligands.atoms:
-                    atom._bfactor = BFACTOR_MID
+                    bfactor_two = score / (-score_min if score < 0 else score_max)
+                    molecule = self._ligands._molecules[atom_tuple[0] - 1 + ligand_index]
+                    if not hasattr(molecule, "atom_score_limits"):
+                        molecule.atom_score_limits = [float('inf'), float('-inf')]
+                    if score < molecule.atom_score_limits[0]:
+                        molecule.atom_score_limits[0] = score
+                    elif score > molecule.atom_score_limits[1]:
+                        molecule.atom_score_limits[1] = score
+
+                    atom = next(itertools.islice(molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
+                    atom.score = score
+            except:
+                err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
+                self._send_notification(NotificationTypes.error, err_msg)
+                nanome.util.Logs.error(err_msg)
+                self.running = False
+                return
 
             ligand_index += 1
 
         colors = []
         scales = []
         for atom in self._ligands.atoms:
-            colors.append(int(255 * ((atom._bfactor - BFACTOR_MIN) / BFACTOR_GAP)))
-            colors.append(255 - int(255 * ((atom._bfactor - BFACTOR_MIN) / BFACTOR_GAP)))
-            colors.append(0)
-            scale = (abs(BFACTOR_MID - atom._bfactor) / BFACTOR_HALF) * 1.0 + 0.1
+            red = 0
+            green = 0
+            blue = 0
+            if hasattr(atom, "score"):
+                ligand = atom.molecule
+                denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
+                norm_score = atom.score / denominator
+                red = 255 if norm_score > 0 else 0
+                green = 255 if -norm_score >= 0 else 0
+                red_scale = int(max(norm_score*255, 0))
+                green_scale = int(max(-norm_score*255, 0))
+                scale = max(green_scale,red_scale) / 255. * 1.5
+            else:
+                green = 0
+                red = 255
+                scale = 1
+                
+            colors.append(red)
+            colors.append(green)
+            colors.append(blue)
             scales.append(scale)
-
-        self._color_stream.update(colors)
-        self._scale_stream.update(scales)
+        
+        try:
+            self._color_stream.update(colors)
+            self._scale_stream.update(scales)
+        except:
+            print(colors)
 
     def display_results(self):
         scores = []
         with open(RESULTS_PATH) as results_file:
             results = results_file.readlines()
-            count = len(results)
-            i = results.index('@RESULTS\n') + 4
+            number_of_lines = len(results)
+            line_index = results.index('@RESULTS\n') + 4
 
-            while i < count:
-                if results[i] == '\n':
+            while line_index < number_of_lines:
+                if results[line_index] == '\n':
                     break
-                result = results[i].split('|')
+                result = results[line_index].split('|')
                 name = result[1].strip()
                 score = result[5].strip()
                 scores.append('%s: %s' % (name, score))
-                i += 1
+                line_index += 1
         
         self._ls_results.items = []
         for score in scores:
