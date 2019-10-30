@@ -179,12 +179,17 @@ class RealtimeScoring(nanome.PluginInstance):
         def set_complexes(complex_list):
             self._complexes = complex_list
 
-            for line_index in range(0, len(complex_list)):
-                complex = complex_list[line_index].convert_to_frames()
-                complex.index = complex_list[line_index].index
-                complex_list[line_index] = complex
+            for complex_i in range(0, len(complex_list)):
+                complex = complex_list[complex_i].convert_to_frames()
+                complex.index = complex_list[complex_i].index
+                complex_list[complex_i] = complex
+                print("complex i:", complex_i)
                 for atom in complex.atoms:
                     atom._old_position = atom.position
+                    if complex_i > 0:
+                        atom.labeled = True
+                        if " ({})".format(atom.symbol) not in atom.label_text:
+                            atom.label_text += " ({})".format(atom.symbol)
             self.update_structures_deep(complex_list[1:], functools.partial(self.request_complexes, index_list, self.setup_streams))
         
         index_list = [self._receptor_index] + self._ligand_indices
