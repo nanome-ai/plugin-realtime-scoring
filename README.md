@@ -1,8 +1,8 @@
 # Nanome - Realtime Scoring
 
-Displays the docking score of all molecules in the workspace, in realtime.
+Displays the docking score of selected molecules in the workspace, in realtime using DSX.
 
-Runs only on Linux for now
+Linux Support Only
 
 ### Installation
 
