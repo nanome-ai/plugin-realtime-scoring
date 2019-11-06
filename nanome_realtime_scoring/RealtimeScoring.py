@@ -206,18 +206,18 @@ class RealtimeScoring(nanome.PluginInstance):
             complexes_converted = 0
             for complex_i in range(0, len(complex_list)):
                 complex = complex_list[complex_i]
-                molecules = list(complex.molecules)
-                has_multiple_frames = len(molecules) > 1 or molecules[0].conformer_count > 1
-                if self.settings.score_all_frames():
-                    complex = complex_list[complex_i].convert_to_frames()
-                    complex.index = complex_list[complex_i].index
-                    complex_list[complex_i] = complex
-                elif has_multiple_frames:
+                complex = complex_list[complex_i].convert_to_frames()
+                complex.index = complex_list[complex_i].index
+                complex_list[complex_i] = complex
+
+                has_multiple_frames = len(list(complex.molecules)) > 1
+                if has_multiple_frames:
                     # remove all but current frame
                     self.single_frameify_complex(complex_list[complex_i])
                     complex_list[complex_i].full_name = complex_list[complex_i].name + " (Scoring)"
                     complex_list[complex_i].visible = True
                     complexes_converted += 1
+
                 for atom in complex_list[complex_i].atoms:
                     atom._old_position = atom.position
                     if complex_i > 0:
@@ -235,18 +235,16 @@ class RealtimeScoring(nanome.PluginInstance):
         index_list = [self._receptor_index] + self._ligand_indices
         self.request_complexes(index_list, set_complexes)
 
-    def update_complexes_and_setup_streams(self, complexes):
-        for i, complex in enumerate(self._complexes[1:]):
+    def reassign_complexes_and_setup_streams(self, complexes):
+        for complex in complexes:
             for atom in complex.atoms:
-                for atom_new in complexes[i].atoms:
-                    atom_new._old_position = atom._old_position
+                atom._old_position = atom.position
         self._complexes = [self._complexes[0]]+complexes
         self.setup_streams(complexes)
 
     def get_last_n_complexes(self, n, complexes_shallow):
-        # print("getting last {} complexes from {}".format(n, [complex.name for complex in complexes_shallow]))
         complex_indices = [complex.index for complex in complexes_shallow[-n:]]
-        self.request_complexes(complex_indices, self.update_complexes_and_setup_streams)
+        self.request_complexes(complex_indices, self.reassign_complexes_and_setup_streams)
 
     def get_updated_complexes(self):
         self.benchmark_stop("total")
