@@ -84,6 +84,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self._receptor_index = None
         self._ligand_indices = []
+        self._ligand_names = []
         self._complexes = []
 
         self.menu.enabled = True
@@ -146,6 +147,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self.request_complex_list(self.update_lists)
 
     def start_scoring(self):
+        self.menu.title = "Per Contact Scores"
         if self._receptor_index is None:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
             return
@@ -167,9 +169,11 @@ class RealtimeScoring(nanome.PluginInstance):
         self._scale_stream = None
         
         self.benchmark_start("total")
+        self.turn_multiframe_ligs_invisible()
         self.get_full_complexes()
 
     def stop_scoring(self):
+        self.menu.title = "Realtime Scoring"
         self._is_running = False
         self._obabel_running = False
         self._dsx_running = False
@@ -200,10 +204,21 @@ class RealtimeScoring(nanome.PluginInstance):
             framed_complex.index = -1
         return framed_complex
 
+    def turn_multiframe_ligs_invisible(self):
+        index_list = self._ligand_indices
+        def make_invisible_if_multiframe(complexes):
+            for complex in complexes:
+                molecule = next(complex.molecules)
+                if len(list(complex.molecules)) > 1 or molecule.conformer_count > 1:
+                    complex.visible = False
+            self.update_structures_deep(complexes)
+        self.request_complexes(self._ligand_indices, make_invisible_if_multiframe)
+
     def get_full_complexes(self):
         def set_complexes(complex_list):
             self._complexes = complex_list
             complexes_converted = 0
+
             for complex_i in range(0, len(complex_list)):
                 complex = complex_list[complex_i]
                 complex = complex_list[complex_i].convert_to_frames()
@@ -217,13 +232,17 @@ class RealtimeScoring(nanome.PluginInstance):
                     complex_list[complex_i].full_name = complex_list[complex_i].name + " (Scoring)"
                     complex_list[complex_i].visible = True
                     complexes_converted += 1
-
+                
+                if complex_i > 0:
+                    self._ligand_names.append(complex_list[complex_i].full_name)
+                    for residue in complex_list[complex_i].residues:
+                        residue.labeled = False
                 for atom in complex_list[complex_i].atoms:
                     atom._old_position = atom.position
                     if complex_i > 0:
                         atom.labeled = True
                         if " ({})".format(atom.symbol) not in atom.label_text:
-                            atom.label_text += " ({})".format(atom.symbol)
+                            atom.label_text = " ({})".format(atom.symbol)
             
             if complexes_converted == 0:
                 self.update_structures_deep(complex_list[1:], functools.partial(self.request_complexes, index_list[1:], self.setup_streams))
@@ -448,20 +467,22 @@ class RealtimeScoring(nanome.PluginInstance):
                 result = results[res_line_i].split('|')
                 name = result[1].strip()
                 score = result[5].strip()
-                scores.append('%s: %s' % (name, score))
+                scores.append(score)
                 res_line_i += 1
         
         self._ls_results.items = []
-        for score in scores:
+        for i, score in enumerate(scores):
             clone = self._pfb_result.clone()
             lbl = clone.get_content()
-            lbl.text_value = score
+            lbl.text_value = '{}: {}'.format(self._ligand_names[i], score)
             self._ls_results.items.append(clone)
         self.update_content(self._ls_results)
 
     def update_lists(self, complex_list):
         if self._is_running:
             return
+
+        self._shallow_complexes = complex_list
 
         def update_selected_ligands():
             self._ligand_indices = []

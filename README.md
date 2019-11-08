@@ -1,6 +1,6 @@
 # Nanome - Realtime Scoring
 
-Displays the docking score of selected molecules in the workspace, in realtime using DSX.
+Displays the docking score of selected molecules in the workspace, in realtime using DSX. Support for scoring multiple docking results concurrently is experimental, but available through the options menu.
 
 Linux Support Only
 
