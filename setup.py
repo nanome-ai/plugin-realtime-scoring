@@ -6,7 +6,7 @@ README = (pathlib.Path(__file__).parent / "README.md").read_text()
 setup(
 	name = 'nanome-realtime-scoring',
 	packages=find_packages(),
-	version = '0.2.0',
+	version = '0.2.1',
 	license='MIT',
 	description = 'Nanome Plugin displaying docking score of complexes in the workspace, in realtime',
 	long_description = README,
