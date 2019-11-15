@@ -34,7 +34,8 @@ setup(
 	package_data={
         "nanome_realtime_scoring": [
             "*.json",
-			"dsx/*"
+			"dsx/*",
+			"dsx/*/*"
         ]
 	},
 )
