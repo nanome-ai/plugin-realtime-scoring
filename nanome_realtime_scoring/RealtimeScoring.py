@@ -360,6 +360,7 @@ class RealtimeScoring(nanome.PluginInstance):
         
         if not find_next_ligand():
             Logs.error("Couldn't parse DSX scores")
+            Logs.errror("Output:\n"+str(dsx_output))
             return
 
         ligand_index = 0

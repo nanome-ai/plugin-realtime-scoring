@@ -4,3 +4,7 @@ dist/
 nanome_realtime_scoring.egg-info/
 *.pyc
 nanome_realtime_scoring/dsx/results.txt
+*.pdb
+*.mol2
+*.sdf
+*dsx*.txt
