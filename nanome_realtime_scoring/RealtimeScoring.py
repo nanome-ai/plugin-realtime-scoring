@@ -419,7 +419,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
                 self.send_notification(NotificationTypes.error, err_msg)
                 nanome.util.Logs.error(err_msg)
-                self.running = False
+                self._is_running = False
                 return
 
             ligand_index += 1
