@@ -36,7 +36,7 @@ class RealtimeScoring(nanome.PluginInstance):
         if not fn_name in self._benchmarks:
             self._benchmarks[fn_name] = [0, 0, 0]
         self._benchmarks[fn_name][0] = timer()
-    
+
     def benchmark_stop(self, fn_name):
         entry = self._benchmarks[fn_name]
         time = timer() - entry[0]
@@ -125,7 +125,7 @@ class RealtimeScoring(nanome.PluginInstance):
         if not self._is_running:
             return
 
-        if self._obabel_running: 
+        if self._obabel_running:
             if self._obabel_process.poll() is not None:
                 self.benchmark_stop("obabel")
                 self._obabel_running = False
@@ -134,12 +134,12 @@ class RealtimeScoring(nanome.PluginInstance):
             if self._dsx_process.poll() is not None:
                 self.benchmark_stop("dsx")
                 self._dsx_running = False
-                
+
                 self.get_updated_complexes()
                 dsx_output, _ = self._dsx_process.communicate()
                 self.parse_scores(dsx_output)
                 self.display_results()
-    
+
     def on_complex_added(self):
         self.request_complex_list(self.update_lists)
 
@@ -151,11 +151,11 @@ class RealtimeScoring(nanome.PluginInstance):
         if self._receptor_index is None:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
             return
-            
+
         if len(self._ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
-            
+
         self._is_running = True
         self._obabel_running = False
         self._dsx_running = False
@@ -164,10 +164,10 @@ class RealtimeScoring(nanome.PluginInstance):
         self._p_selection.enabled = False
         self._p_results.enabled = True
         self.update_menu(self.menu)
-        
+
         self._color_stream = None
         self._scale_stream = None
-        
+
         self.benchmark_start("total")
         self.turn_multiframe_ligs_invisible()
         self.get_full_complexes()
@@ -177,7 +177,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._is_running = False
         self._obabel_running = False
         self._dsx_running = False
-        
+
         self._btn_score.set_all_text("Start scoring")
         self._p_selection.enabled = True
         self._p_results.enabled = False
@@ -232,7 +232,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     complex_list[complex_i].full_name = complex_list[complex_i].name + " (Scoring)"
                     complex_list[complex_i].visible = True
                     complexes_converted += 1
-                
+
                 if complex_i > 0:
                     self._ligand_names.append(complex_list[complex_i].full_name)
                     for residue in complex_list[complex_i].residues:
@@ -243,14 +243,14 @@ class RealtimeScoring(nanome.PluginInstance):
                         atom.labeled = True
                         if " ({})".format(atom.symbol) not in atom.label_text:
                             atom.label_text = " ({})".format(atom.symbol)
-            
+
             if complexes_converted == 0:
                 self.update_structures_deep(complex_list[1:], functools.partial(self.request_complexes, index_list[1:], self.setup_streams))
             else:
                 # update structures(request complex list(get len(complex_list)-1 last complex indices, pass these indices to setup streams))
                 get_new_ligands = functools.partial(self.get_last_n_complexes, len(index_list[1:]))
                 self.update_structures_deep(complex_list[1:], functools.partial(self.request_complex_list, get_new_ligands))
-        
+
         index_list = [self._receptor_index] + self._ligand_indices
         self.request_complexes(index_list, set_complexes)
 
@@ -269,7 +269,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self.benchmark_stop("total")
         nanome.util.Logs.debug('*' * 32)
         self.benchmark_start("total")
-    
+
         def update_complexes(complex_list):
             # update self._complexes positions from shallow list
             for complex in self._complexes:
@@ -281,7 +281,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
             self.benchmark_stop("update")
             self.prepare_complexes(self._complexes)
-        
+
         self.benchmark_start("update")
         self.request_complex_list(update_complexes)
 
@@ -328,7 +328,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 index = molecule.index
                 ligands.add_molecule(molecule)
                 molecule.index = index
-        
+
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
 
@@ -347,7 +347,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def parse_scores(self, dsx_output):
         lines = dsx_output.splitlines()
         number_of_lines = len(lines)
-        
+
         line_index = 0
         def find_next_ligand():
             nonlocal line_index
@@ -357,7 +357,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     return True
                 line_index += 1
             return False
-        
+
         if not find_next_ligand():
             Logs.error("Couldn't parse DSX scores")
             Logs.error("Output:\n"+str(dsx_output))
@@ -371,7 +371,7 @@ class RealtimeScoring(nanome.PluginInstance):
             last_arr = None
             score_min = None
             score_max = None
-            
+
             while line_index < number_of_lines - 1:
                 line = lines[line_index]
                 if line.startswith("# End of pair potentials"):
@@ -381,8 +381,8 @@ class RealtimeScoring(nanome.PluginInstance):
                 atom_items = line_items[1].split("_")
                 score = float(line_items[2])
                 ireceptor_iligand = (int(atom_items[1]), int(atom_items[2]))
-                
-                if last_tuple != ireceptor_iligand:    
+
+                if last_tuple != ireceptor_iligand:
                     if ireceptor_iligand in scores:
                         last_arr = scores[ireceptor_iligand]
                     else:
@@ -396,7 +396,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 if score_max == None or score > score_max:
                     score_max = score
                 line_index += 1
-            
+
             if score_max is None or score_min is None:
                 continue
             score_gap = max(score_max - score_min, 0.01)
@@ -417,7 +417,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     atom.score = score
             except:
                 err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
-                self._send_notification(NotificationTypes.error, err_msg)
+                self.send_notification(NotificationTypes.error, err_msg)
                 nanome.util.Logs.error(err_msg)
                 self.running = False
                 return
@@ -443,12 +443,12 @@ class RealtimeScoring(nanome.PluginInstance):
                 green = 0
                 red = 255
                 scale = 1
-                
+
             colors.append(red)
             colors.append(green)
             colors.append(blue)
             scales.append(scale)
-        
+
         try:
             self._color_stream.update(colors)
             self._scale_stream.update(scales)
@@ -470,7 +470,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 score = result[5].strip()
                 scores.append(score)
                 res_line_i += 1
-        
+
         self._ls_results.items = []
         for i, score in enumerate(scores):
             clone = self._pfb_result.clone()
@@ -505,14 +505,14 @@ class RealtimeScoring(nanome.PluginInstance):
                 if ligand.selected and ligand.unusable:
                     ligand.selected = False
             update_selected_ligands()
-            
+
             self.update_menu(self.menu)
 
         def ligand_pressed(ligand):
             ligand.selected = not ligand.selected
             self.update_content(ligand)
             update_selected_ligands()
-        
+
         def populate_list(ls, cb):
             ls.items = []
             for complex in complex_list:
