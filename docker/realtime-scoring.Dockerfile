@@ -1,12 +1,10 @@
 FROM continuumio/miniconda3
 
-ENV PLUGIN_SERVER=plugins.nanome.ai
-
+ENV ARGS=''
 COPY . /app
 WORKDIR /app
 
-# TODO: Wait and then remove. :)
-# RUN conda install -y -c openbabel openbabel
 RUN pip install nanome
+RUN conda install -c openbabel openbabel
 
-CMD python -m nanome_realtime_scoring.RealtimeScoring -a ${PLUGIN_SERVER}
+CMD python run.py ${ARGS}

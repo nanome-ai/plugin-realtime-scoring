@@ -1,13 +1,10 @@
-if [ "$(docker ps -aq -f name=realtime_scoring)" != "" ]; then
-        # cleanup
-        echo "removing exited container"
-        docker rm -f realtime_scoring
+if [ "$(docker ps -aq -f name=realtime-scoring)" != "" ]; then
+    # cleanup
+    echo "removing exited container"
+    docker rm -f realtime-scoring
 fi
 
-if [ "$1" != "" ]; then
-    echo "Using specified plugin server: $1"
-    docker run -d -p 8888:8888 -e PLUGIN_SERVER=$1 --name realtime_scoring realtime-scoring
-else
-    echo "Using default plugin server: plugins.nanome.ai"
-    docker run -d -p 8888:8888 --name realtime_scoring realtime-scoring
-fi
+docker run -d \
+--restart always \
+-e ARGS="$*" \
+--name realtime-scoring realtime-scoring
