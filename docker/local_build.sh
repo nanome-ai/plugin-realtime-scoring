@@ -1,1 +1,0 @@
-docker build -f realtime-scoring.Dockerfile -t realtime-scoring:latest ..
