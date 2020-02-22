@@ -25,6 +25,16 @@ In Nanome:
 - Plugin will display a list of all other complexes, with their docking score
 - Moving a complex around will update its score
 
+### Docker Usage
+
+To run in a Docker container:
+
+```sh
+$ cd docker
+$ ./build.sh
+$ ./deploy.sh -a <plugin_server_address>
+```
+
 ### License
 
 MIT
