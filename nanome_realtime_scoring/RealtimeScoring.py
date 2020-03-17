@@ -3,6 +3,7 @@ from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 
 import os
+import shlex
 import functools
 import subprocess
 import tempfile
@@ -78,7 +79,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._pfb_result.add_new_label()
 
         self._is_running = False
-        self._obabel_running = False
+        self._nanobabel_running = False
         self._dsx_running = False
         self._ligands = None
 
@@ -125,10 +126,11 @@ class RealtimeScoring(nanome.PluginInstance):
         if not self._is_running:
             return
 
-        if self._obabel_running:
-            if self._obabel_process.poll() is not None:
-                self.benchmark_stop("obabel")
-                self._obabel_running = False
+        if self._nanobabel_running:
+            Logs.debug(self._nanobabel_process.communicate())
+            if self._nanobabel_process.poll() is not None:
+                self.benchmark_stop("nanobabel")
+                self._nanobabel_running = False
                 self.dsx_start()
         elif self._dsx_running:
             if self._dsx_process.poll() is not None:
@@ -157,7 +159,7 @@ class RealtimeScoring(nanome.PluginInstance):
             return
 
         self._is_running = True
-        self._obabel_running = False
+        self._nanobabel_running = False
         self._dsx_running = False
 
         self._btn_score.set_all_text("Stop scoring")
@@ -175,7 +177,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def stop_scoring(self):
         self.menu.title = "Realtime Scoring"
         self._is_running = False
-        self._obabel_running = False
+        self._nanobabel_running = False
         self._dsx_running = False
 
         self._btn_score.set_all_text("Start scoring")
@@ -332,16 +334,17 @@ class RealtimeScoring(nanome.PluginInstance):
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
 
-        self.obabel_start()
+        self.nanobabel_start()
 
-    def obabel_start(self):
-        obabel_args = ['obabel', '-isdf', self._ligands_input.name, '-omol2', '-O' + self._ligands_converted.name]
+    def nanobabel_start(self):
+        cmd = f'nanobabel convert -i {self._ligands_input.name} -o {self._ligands_converted.name}'
+        args = shlex.split(cmd)
         try:
-            self._obabel_process = subprocess.Popen(obabel_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            self._obabel_running = True
-            self.benchmark_start("obabel")
+            self._nanobabel_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self._nanobabel_running = True
+            self.benchmark_start("nanobabel")
         except:
-            nanome.util.Logs.error("Couldn't execute obabel, please check if packet 'openbabel' is installed")
+            nanome.util.Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return
 
     def parse_scores(self, dsx_output):

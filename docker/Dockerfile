@@ -1,11 +1,17 @@
-FROM continuumio/miniconda3
+FROM nanome/nanobabel
 
-ENV ARGS=''
+ENV ARGS="-a plugins.nanome.ai"
 
-RUN pip install nanome
-RUN conda install -c openbabel openbabel
+RUN apt install software-properties-common
+RUN add-apt-repository -y ppa:deadsnakes/ppa
+RUN apt update
+RUN apt install -y python3.7
+RUN apt install -y python3-pip
+
+RUN pip3 install --upgrade pip
+RUN python3.7 -m pip install nanome
 
 COPY . /app
 WORKDIR /app
 
-CMD python run.py ${ARGS}
+CMD python3.7 run.py ${ARGS}
