@@ -62,24 +62,6 @@ class RealtimeScoring(nanome.PluginInstance):
                     self.stop_scoring()
                 else:
                     self.start_scoring()
-        
-        def total_pressed(button):
-            if self._show_total:
-                self._btn_total.set_all_text("off")
-                self._show_total = False
-            else:
-                self._btn_total.set_all_text("on")
-                self._show_total = True
-            self.update_menu(self.menu)
-        
-        def pcs_pressed(button):
-            if self._show_pcs:
-                self._show_pcs = False
-                self._btn_pcs.set_all_text("off")
-            else:
-                self._show_pcs = True
-                self._btn_pcs.set_all_text("on")
-            self.update_menu(self.menu)
 
         self._menu = nanome.ui.Menu.io.from_json(os.path.join(DIR, 'menu.json'))
         self.menu = self._menu
@@ -92,10 +74,6 @@ class RealtimeScoring(nanome.PluginInstance):
         self._ls_results = self._p_results.get_content()
         self._btn_score = self._menu.root.find_node("Button", True).get_content()
         self._btn_score.register_pressed_callback(button_pressed)
-        self._btn_total = self._menu.root.find_node("Total Button", True).get_content()
-        self._btn_total.register_pressed_callback(total_pressed)
-        self._btn_pcs = self._menu.root.find_node("PCS Button", True).get_content()
-        self._btn_pcs.register_pressed_callback(pcs_pressed)
 
         self._pfb_complex = nanome.ui.LayoutNode()
         self._pfb_complex.add_new_button()
@@ -627,13 +605,13 @@ class RealtimeScoring(nanome.PluginInstance):
         for i, score in enumerate(scores):
             clone = self._pfb_result.clone()
             lbl = clone.get_content()
-            if self._show_total and self._show_pcs:
+            if self.settings.show_total and self.settings.show_pcs:
                 format_str = '{}: {}={}; {}={}'
                 lbl.text_value = format_str.format(self._ligand_names[i], "TS", scores[i], "PCS", pcss[i])
-            elif self._show_total:
+            elif self.settings.show_total:
                 format_str = '{}: {}={}'
                 lbl.text_value = format_str.format(self._ligand_names[i], "TS", scores[i])
-            elif self._show_pcs:
+            elif self.settings.show_pcs:
                 format_str = '{}: {}={}'
                 lbl.text_value = format_str.format(self._ligand_names[i], "PCS", pcss[i])
             else:
