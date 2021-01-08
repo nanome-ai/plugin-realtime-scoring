@@ -1,8 +1,5 @@
 __pycache__
-dsx/results.txt
 /.vscode
-/build
-/dist
 /docker/.cachebust
 *.egg-info
 *.log
@@ -10,3 +7,5 @@ dsx/results.txt
 *.pdb
 *.sdf
 *dsx*.txt
+.devcontainer/
+nanome_realtime_scoring/dsx/results.txt

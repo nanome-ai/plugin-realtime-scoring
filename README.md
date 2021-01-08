@@ -35,6 +35,13 @@ $ ./build.sh
 $ ./deploy.sh -a <plugin_server_address>
 ```
 
+### Plugin Details
+
+The following scores from DSX can be displayed:
+
+- Total score: Total docking score for the ligand including possible torsion, sas and intramolecular contributions.
+- Per contact score: Total score divided by the number of atom-atom-interactions having any contribution to the total score. (Do not confuse with a per atom score)
+
 ### License
 
 MIT
