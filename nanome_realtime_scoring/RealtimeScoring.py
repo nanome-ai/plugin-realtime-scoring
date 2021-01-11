@@ -84,27 +84,27 @@ class RealtimeScoring(nanome.PluginInstance):
         self._is_running = False
         self._nanobabel_running = False
         self._dsx_running = False
-        self._ligands = None
 
+        self._ligands = None
         self._receptor_index = None
         self._ligand_indices = []
         self._ligand_names = []
         self._complexes = []
-
-        self._show_total = True
-        self._show_pcs = True
         self._spheres = []
+        self._sphere_count = 0
+        self._atom_count = 0
+        self._ligand_atom_counts = {}
+        self._ligand_frames = {}
+        self._color_stream = None
+        self._scale_stream = None
+
         self._is_button_loading = False
         self._streams_ready = False
         self._creating_streams = False
-        self._sphere_count = 0
-        self._atom_count = 0
-        self._color_stream = None
-        self._scale_stream = None
         self._uploading_spheres = False
         self._delete_spheres = False
-        self._ligand_atom_counts = {}
-        self._ligand_frames = {}
+        self._stop_after_deleting_spheres = False
+        self._respond_to_update = True
 
         self.menu.enabled = True
         self.update_menu(self.menu)
@@ -218,9 +218,11 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self._scores_ready = False
         self._creating_streams = False
+        self._stop_after_deleting_spheres = False
 
         self.benchmark_start("total")
 
+        self._respond_to_update = False
         self.get_full_complexes()
         
 
@@ -235,6 +237,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
         if self._uploading_spheres:
             self._delete_spheres=True
+            self._stop_after_deleting_spheres=True
         else:
             self.clear_sphere_streams()
 
@@ -251,6 +254,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def get_full_complexes(self):
 
         def set_complexes(complex_list):
+            self._respond_to_update = True
             self._complexes = complex_list
             self._ligand_names=[]
             self._ligand_atom_counts={}
@@ -285,9 +289,11 @@ class RealtimeScoring(nanome.PluginInstance):
                     complex_list[complex_i].register_complex_updated_callback(complex_updated_callback)
 
             self.unfreeze_button("Stop scoring")
-            self.hide_scores(True)        
+            self.hide_scores(True)
+            self._respond_to_update = False
             self.update_structures_deep(complex_list[0:], functools.partial(self.request_complexes, index_list[1:], self.setup_spheres))
 
+        self._respond_to_update = True
         index_list = [self._receptor_index] + self._ligand_indices
         self.request_complexes(index_list, set_complexes)
 
@@ -347,7 +353,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def setup_spheres(self, complex_list):
         if not self._is_running:
             return
-        
+        self._respond_to_update = True
         self._uploading_spheres = True
         self._delete_spheres = False
         self._curr_complex_list = complex_list
@@ -362,7 +368,7 @@ class RealtimeScoring(nanome.PluginInstance):
             for atom in curr_atoms:
                 self._atom_count += 1
                 sphere = self.create_shape(nanome.util.enums.ShapeType.Sphere)
-                sphere.color = nanome.util.Color(100,100,100,150)
+                sphere.color = nanome.util.Color(100,100,100,120)
                 sphere.radius = 1.3
                 sphere.anchor = nanome.util.enums.ShapeAnchorType.Atom
                 sphere.target = atom.index
@@ -377,7 +383,8 @@ class RealtimeScoring(nanome.PluginInstance):
             if self._delete_spheres:
                 self._creating_streams=False
                 self.clear_sphere_streams()
-                self.get_full_complexes()
+                if not self._stop_after_deleting_spheres:
+                    self.get_full_complexes()
             else:
                 self._creating_streams=True
                 self.setup_streams(self._curr_complex_list)
@@ -385,21 +392,24 @@ class RealtimeScoring(nanome.PluginInstance):
     def complex_updated(self, complex_list, complex):
         if not self._is_running:
             return
+        if not self._respond_to_update:
+            return
         molecule_list = list(complex.molecules)
         atom_count = len(list(molecule_list[complex.current_frame].atoms))
         if self._ligand_frames[complex.index] != complex.current_frame or \
            self._ligand_atom_counts[complex.index] != atom_count:
             if self._uploading_spheres:
+                self._respond_to_update = False
                 self._delete_spheres = True
                 self.hide_scores(True)
             elif self._creating_streams:
+                self._respond_to_update = False
+                self._creating_streams = False
                 self.clear_sphere_streams()
                 self.hide_scores(True)
                 self.get_full_complexes()
             else:
-                err_msg = "Error: Tried to change ligand while initializing scores"
-                self.send_notification(NotificationTypes.error, err_msg)
-                self.stop_scoring()
+                self._respond_to_update = True
 
     def setup_streams(self, complex_list):
         self._sphere_indices=[]
@@ -550,7 +560,7 @@ class RealtimeScoring(nanome.PluginInstance):
             red = 0
             green = 0
             blue = 0
-            alpha = 150
+            alpha = 120
             if hasattr(atom, "score"):
                 ligand = atom.molecule
                 denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
