@@ -13,6 +13,32 @@ class SettingsMenu():
 
         self._btn_score_all_frames = self._menu.root.find_node('Button').get_content()
         self._btn_score_all_frames.register_pressed_callback(self.toggle_score_all_frames)
+
+        self.show_total = True
+        self.show_pcs = True
+
+        def total_pressed(button):
+            if self.show_total:
+                button.set_all_text("off")
+                self.show_total = False
+            else:
+                button.set_all_text("on")
+                self.show_total = True
+            self._plugin.update_content(button)
+        
+        def pcs_pressed(button):
+            if self.show_total:
+                button.set_all_text("off")
+                self.show_pcs = False
+            else:
+                button.set_all_text("on")
+                self.show_pcs = True
+            self._plugin.update_content(button)
+
+        self._btn_total = self._menu.root.find_node("Total Button", True).get_content()
+        self._btn_total.register_pressed_callback(total_pressed)
+        self._btn_pcs = self._menu.root.find_node("PCS Button", True).get_content()
+        self._btn_pcs.register_pressed_callback(pcs_pressed)
     
     def open_menu(self, menu=None):
         self._plugin.menu = self._menu
