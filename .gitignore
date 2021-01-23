@@ -1,5 +1,5 @@
 __pycache__
-dsx/results.txt
+nanome_realtime_scoring/dsx/results.txt
 /.vscode
 /build
 /dist
@@ -11,4 +11,3 @@ dsx/results.txt
 *.sdf
 *dsx*.txt
 .devcontainer/
-nanome_realtime_scoring/dsx/results.txt
