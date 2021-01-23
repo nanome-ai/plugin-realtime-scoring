@@ -10,4 +10,3 @@ nanome_realtime_scoring/dsx/results.txt
 *.pdb
 *.sdf
 *dsx*.txt
-.devcontainer/
