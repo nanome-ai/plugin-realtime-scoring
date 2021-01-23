@@ -1,5 +1,8 @@
 __pycache__
+dsx/results.txt
 /.vscode
+/build
+/dist
 /docker/.cachebust
 *.egg-info
 *.log
