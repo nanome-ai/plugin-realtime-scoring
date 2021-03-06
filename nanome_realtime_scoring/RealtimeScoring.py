@@ -560,7 +560,7 @@ class RealtimeScoring(nanome.PluginInstance):
             red = 0
             green = 0
             blue = 0
-            alpha = 120
+            alpha = 141
             if hasattr(atom, "score"):
                 ligand = atom.molecule
                 denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
