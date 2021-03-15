@@ -95,6 +95,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._atom_count = 0
         self._ligand_atom_counts = {}
         self._ligand_frames = {}
+        self._label_stream = None
         self._color_stream = None
         self._scale_stream = None
 
@@ -284,6 +285,8 @@ class RealtimeScoring(nanome.PluginInstance):
                     self._ligand_names.append(complex_list[complex_i].full_name)
                     for residue in complex_list[complex_i].residues:
                         residue.labeled = False
+                    for atom in complex_list[complex_i].atoms:
+                        atom.labeled = self.settings._labels
 
                     complex_updated_callback = functools.partial(self.complex_updated, complex_list[1:])
                     complex_list[complex_i].register_complex_updated_callback(complex_updated_callback)
@@ -413,24 +416,30 @@ class RealtimeScoring(nanome.PluginInstance):
 
     def setup_streams(self, complex_list):
         self._sphere_indices=[]
+        self._atom_indices=[]
         for i in range(len(self._spheres)):
             self._sphere_indices.append(self._spheres[i].index)
         if self._color_stream == None or self._scale_stream == None:
             indices = []
             for complex in complex_list:
                 for atom in complex.atoms:
-                    indices.append(atom.index)
+                    self._atom_indices.append(atom.index)
             def on_stream_ready(complex_list):
-                if self._color_stream != None and self._scale_stream != None:
+                if self._color_stream != None and self._scale_stream != None and not (self.settings._labels ^ (self._label_stream != None)):
                     self._streams_ready=True
                     self._to_display = True
                     self.get_updated_complexes()
+            def on_label_stream_ready(stream, error):
+                self._label_stream = stream
+                on_stream_ready(complex_list)
             def on_color_stream_ready(stream, error):
                 self._color_stream = stream
                 on_stream_ready(complex_list)
             def on_scale_stream_ready(stream, error):
                 self._scale_stream = stream
                 on_stream_ready(complex_list)
+            if self.settings._labels:
+                self.create_writing_stream(self._atom_indices, nanome.api.streams.Stream.Type.label, on_label_stream_ready)
             self.create_writing_stream(self._sphere_indices, nanome.api.streams.Stream.Type.shape_color, on_color_stream_ready)
             self.create_writing_stream(self._sphere_indices, nanome.api.streams.Stream.Type.sphere_shape_radius, on_scale_stream_ready)
         else:
@@ -554,6 +563,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
             ligand_index += 1
 
+        labels = []
         colors = []
         scales = []
         for atom in self._ligands.atoms:
@@ -571,10 +581,12 @@ class RealtimeScoring(nanome.PluginInstance):
                 green_scale = int(max(-norm_score*255, 0))
                 scale = max(green_scale,red_scale) / 255. + 1
             else:
+                norm_score = 0.0
                 green = 0
                 red = 255
                 scale = 1
 
+            labels.append(f'{norm_score:.3f}')
             colors.append(red)
             colors.append(green)
             colors.append(blue)
@@ -583,6 +595,8 @@ class RealtimeScoring(nanome.PluginInstance):
 
         try:
             if self._streams_ready:
+                if self._label_stream:
+                    self._label_stream.update(labels)
                 self._color_stream.update(colors)
                 self._scale_stream.update(scales)
         except:
@@ -684,7 +698,7 @@ def main():
     description = "Display realtime scoring info about a selected ligand." 
     plugin = nanome.Plugin("Realtime Scoring", description, "Scoring", True)
     plugin.set_plugin_class(RealtimeScoring)
-    plugin.run('127.0.0.1', 8888)
+    plugin.run()
 
 if __name__ == "__main__":
     main()

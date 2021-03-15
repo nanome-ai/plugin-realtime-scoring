@@ -6,16 +6,18 @@ import os
 class SettingsMenu():
     def __init__(self, docking_plugin, closed_callback):
         self._plugin = docking_plugin
+        self._labels = False
         self._score_all_frames = False
+        self.show_total = True
+        self.show_pcs = True
 
         self._menu = nanome.ui.Menu.io.from_json(os.path.join(os.path.dirname(__file__), 'settings.json'))
         self._menu.register_closed_callback(closed_callback)
 
-        self._btn_score_all_frames = self._menu.root.find_node('Button').get_content()
+        self._btn_labels = self._menu.root.find_node('AtomLabelsButton').get_content()
+        self._btn_labels.register_pressed_callback(self.toggle_labels)
+        self._btn_score_all_frames = self._menu.root.find_node('AllFramesButton').get_content()
         self._btn_score_all_frames.register_pressed_callback(self.toggle_score_all_frames)
-
-        self.show_total = True
-        self.show_pcs = True
 
         def total_pressed(button):
             if self.show_total:
@@ -47,6 +49,12 @@ class SettingsMenu():
     
     def score_all_frames(self):
         return self._score_all_frames
+
+    def toggle_labels(self, button):
+        self._labels = not self._labels
+        text = "on" if self._labels else "off"
+        self._btn_labels.set_all_text(text)
+        self._plugin.update_content(self._btn_labels)
 
     def toggle_score_all_frames(self, button):
         self._score_all_frames = not self._score_all_frames
