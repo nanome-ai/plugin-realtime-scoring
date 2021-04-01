@@ -182,12 +182,12 @@ class RealtimeScoring(nanome.PluginInstance):
             lbl.text_value = ''
             self._ls_results.items.append(clone)
             self.update_content(self._ls_results)
-    
+
     def freeze_button(self):
         self._is_button_loading = True
         self._btn_score.set_all_text("Loading...")
         self.update_menu(self.menu)
-    
+
     def unfreeze_button(self, text):
         self._is_button_loading = False
         self._btn_score.set_all_text(text)
@@ -226,7 +226,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self._respond_to_update = False
         self.get_full_complexes()
-        
+
 
     def stop_scoring(self):
         self.freeze_button()
@@ -252,7 +252,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self.update_menu(self.menu)
 
         self.unfreeze_button("Start scoring")
-        
+
     def get_full_complexes(self):
 
         def set_complexes(complex_list):
@@ -334,7 +334,7 @@ class RealtimeScoring(nanome.PluginInstance):
     def clear_sphere_streams(self):
         streams_ready = self._streams_ready
         self._streams_ready = False
-        
+
         scales = []
         if self._spheres != []:
             if streams_ready:
@@ -696,7 +696,7 @@ class RealtimeScoring(nanome.PluginInstance):
         populate_list(self._ls_ligands, ligand_pressed)
 
 def main():
-    description = "Display realtime scoring info about a selected ligand." 
+    description = "Display realtime scoring info about a selected ligand."
     plugin = nanome.Plugin("Realtime Scoring", description, "Scoring", True)
     plugin.set_plugin_class(RealtimeScoring)
     plugin.run()

@@ -1,10 +1,8 @@
 __pycache__
 nanome_realtime_scoring/dsx/results.txt
 /.vscode
-/build
-/dist
 /docker/.cachebust
-*.egg-info
+/docker/redeploy.sh
 *.log
 *.mol2
 *.pdb

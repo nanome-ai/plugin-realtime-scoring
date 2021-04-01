@@ -1,8 +1,12 @@
 #!/bin/bash
 
-if [ "$(docker ps -aq -f name=realtime-scoring)" != "" ]; then
-    echo "removing exited container"
-    docker rm -f realtime-scoring
+echo "./deploy.sh $*" > redeploy.sh
+chmod +x redeploy.sh
+
+existing=$(docker ps -aq -f name=realtime-scoring)
+if [ -n "$existing" ]; then
+    echo "removing existing container"
+    docker rm -f $existing
 fi
 
 docker run -d \
