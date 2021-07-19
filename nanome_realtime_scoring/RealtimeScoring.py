@@ -371,8 +371,6 @@ class RealtimeScoring(nanome.PluginInstance):
                 anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Atom
                 anchor.target = atom.index
                 self._spheres.append(sphere)
-        for i in range(self._atom_count):
-            self._spheres[i].upload(self.on_shape_created)
 
     def on_shape_created(self, success):
         self._sphere_count += 1
