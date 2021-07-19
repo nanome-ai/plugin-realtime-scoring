@@ -182,12 +182,12 @@ class RealtimeScoring(nanome.PluginInstance):
 
     def freeze_button(self):
         self._is_button_loading = True
-        self._btn_score.set_all_text("Loading...")
+        self._btn_score.text.value.set_all("Loading...")
         self.update_menu(self.menu)
 
     def unfreeze_button(self, text):
         self._is_button_loading = False
-        self._btn_score.set_all_text(text)
+        self._btn_score.text.value.set_all(text)
         self.update_menu(self.menu)
 
     def start_scoring(self):
@@ -243,7 +243,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._p_selection.enabled = True
         self._p_results.enabled = False
         self._is_button_loading = False
-        self._btn_score.set_all_text("Start scoring")
+        self._btn_score.text.value.set_all("Start scoring")
         self.request_complex_list(self.update_lists)
         self.update_menu(self.menu)
 
@@ -370,8 +370,9 @@ class RealtimeScoring(nanome.PluginInstance):
                 sphere = shapes.Sphere()
                 sphere.color = nanome.util.Color(100, 100, 100, 120)
                 sphere.radius = 1.3
-                sphere.anchor = nanome.util.enums.ShapeAnchorType.Atom
-                sphere.target = atom.index
+                anchor = sphere.anchors[0]
+                anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Atom
+                anchor.target = atom.index
                 self._spheres.append(sphere)
         for i in range(self._atom_count):
             self._spheres[i].upload(self.on_shape_created)
@@ -685,7 +686,7 @@ class RealtimeScoring(nanome.PluginInstance):
             for complex in complex_list:
                 clone = self._pfb_complex.clone()
                 btn = clone.get_content()
-                btn.set_all_text(complex.full_name)
+                btn.text.value.set_all(complex.full_name)
                 btn.index = complex.index
                 btn.register_pressed_callback(cb)
                 ls.items.append(clone)
