@@ -410,7 +410,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 self._creating_streams = False
                 self.clear_sphere_streams()
                 self.hide_scores(True)
-                self.get_full_complexes()
+                await self.get_full_complexes()
             else:
                 self._respond_to_update = True
 
