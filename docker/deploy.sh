@@ -9,8 +9,10 @@ if [ -n "$existing" ]; then
     docker rm -f $existing
 fi
 
-docker run -d \
+docker run \
 --name realtime-scoring \
 --restart unless-stopped \
 -e ARGS="$*" \
+--mount type=bind,source=/home/mike/workspace/nanome-lib/nanome,target=/opt/conda/lib/python3.7/site-packages/nanome \
+--mount type=bind,source=/home/mike/workspace/plugin-realtime-scoring,target=/app \
 realtime-scoring
