@@ -1,6 +1,8 @@
+import asyncio
 import nanome
 import nanome.api.shapes as shapes
-from nanome.util import Logs
+from nanome.api.shapes import Shape
+from nanome.util import async_callback, Logs
 from nanome.util.enums import NotificationTypes
 
 import os
@@ -36,7 +38,7 @@ DIR = os.path.dirname(__file__)
 RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 
-class RealtimeScoring(nanome.PluginInstance):
+class RealtimeScoring(nanome.AsyncPluginInstance):
     def benchmark_start(self, fn_name):
         if not fn_name in self._benchmarks:
             self._benchmarks[fn_name] = [0, 0, 0]
@@ -58,12 +60,13 @@ class RealtimeScoring(nanome.PluginInstance):
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligands_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
 
-        def button_pressed(button):
+        @async_callback
+        async def button_pressed(button):
             if not self._is_button_loading:
                 if self._is_running:
                     self.stop_scoring()
                 else:
-                    self.start_scoring()
+                    await self.start_scoring()
 
         self._menu = nanome.ui.Menu.io.from_json(os.path.join(DIR, 'menu.json'))
         self.menu = self._menu
@@ -194,7 +197,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._btn_score.text.value.set_all(text)
         self.update_menu(self.menu)
 
-    def start_scoring(self):
+    async def start_scoring(self):
         self.freeze_button()
 
         if self._receptor_index is None:
@@ -226,7 +229,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self.benchmark_start("total")
 
         self._respond_to_update = False
-        self.get_full_complexes()
+        await self.get_full_complexes()
 
     def stop_scoring(self):
         self.freeze_button()
@@ -253,53 +256,54 @@ class RealtimeScoring(nanome.PluginInstance):
 
         self.unfreeze_button("Start scoring")
 
-    def get_full_complexes(self):
-
-        def set_complexes(complex_list):
-            self._respond_to_update = True
-            self._complexes = complex_list
-            self._ligand_names = []
-            self._ligand_atom_counts = {}
-            self._ligand_frames = {}
-            atom_counts = [0 for _ in range(len(complex_list))]
-            for complex_i in range(0, len(complex_list)):
-                complex = complex_list[complex_i]
-                complex.locked = True
-                complex = complex_list[complex_i].convert_to_frames()
-                complex.index = complex_list[complex_i].index
-                complex_list[complex_i] = complex
-                molecule_list = list(complex.molecules)
-                atom_counts[complex_i] = len(list(molecule_list[complex.current_frame].atoms))
-
-                for atom in complex_list[complex_i].atoms:
-                    atom._old_position = atom.position
-
-                if complex_i > 0:
-                    if (atom_counts[complex_i] > atom_counts[0]):
-                        err_msg = "Error with receptor/ligand combination. Ligand cannot be larger than receptor."
-                        Logs.error(err_msg)
-                        self.send_notification(NotificationTypes.error, err_msg)
-                        self.stop_scoring()
-                        return
-                    self._ligand_frames[complex.index] = complex.current_frame
-                    self._ligand_atom_counts[complex.index] = atom_counts[complex_i]
-                    self._ligand_names.append(complex_list[complex_i].full_name)
-                    for residue in complex_list[complex_i].residues:
-                        residue.labeled = False
-                    for atom in complex_list[complex_i].atoms:
-                        atom.labeled = self.settings._labels
-
-                    complex_updated_callback = functools.partial(self.complex_updated, complex_list[1:])
-                    complex_list[complex_i].register_complex_updated_callback(complex_updated_callback)
-
-            self.unfreeze_button("Stop scoring")
-            self.hide_scores(True)
-            self._respond_to_update = False
-            self.update_structures_deep(complex_list[0:], functools.partial(self.request_complexes, index_list[1:], self.setup_spheres))
-
+    async def get_full_complexes(self):
         self._respond_to_update = True
         index_list = [self._receptor_index] + self._ligand_indices
-        self.request_complexes(index_list, set_complexes)
+        complex_list = await self.request_complexes(index_list)
+
+        self._respond_to_update = True
+        self._complexes = complex_list
+        self._ligand_names = []
+        self._ligand_atom_counts = {}
+        self._ligand_frames = {}
+        atom_counts = [0 for _ in range(len(complex_list))]
+        for complex_i in range(0, len(complex_list)):
+            complex = complex_list[complex_i]
+            complex.locked = True
+            complex = complex_list[complex_i].convert_to_frames()
+            complex.index = complex_list[complex_i].index
+            complex_list[complex_i] = complex
+            molecule_list = list(complex.molecules)
+            atom_counts[complex_i] = len(list(molecule_list[complex.current_frame].atoms))
+
+            for atom in complex_list[complex_i].atoms:
+                atom._old_position = atom.position
+
+            if complex_i > 0:
+                if (atom_counts[complex_i] > atom_counts[0]):
+                    err_msg = "Error with receptor/ligand combination. Ligand cannot be larger than receptor."
+                    Logs.error(err_msg)
+                    self.send_notification(NotificationTypes.error, err_msg)
+                    self.stop_scoring()
+                    return
+                self._ligand_frames[complex.index] = complex.current_frame
+                self._ligand_atom_counts[complex.index] = atom_counts[complex_i]
+                self._ligand_names.append(complex_list[complex_i].full_name)
+                for residue in complex_list[complex_i].residues:
+                    residue.labeled = False
+                for atom in complex_list[complex_i].atoms:
+                    atom.labeled = self.settings._labels
+
+                complex_updated_callback = functools.partial(self.complex_updated, complex_list[1:])
+                complex_list[complex_i].register_complex_updated_callback(complex_updated_callback)
+
+        self.unfreeze_button("Stop scoring")
+        self.hide_scores(True)
+        self._respond_to_update = False
+
+        updated_stuff = await self.update_structures_deep(complex_list[0:])
+        complexes = await self.request_complexes(index_list[1:])
+        await self.setup_spheres(complexes)
 
     def reassign_complexes_and_setup_streams(self, complexes):
         for complex in complexes:
@@ -354,7 +358,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._color_stream = None
         self._scale_stream = None
 
-    def setup_spheres(self, complex_list):
+    async def setup_spheres(self, complex_list):
         if not self._is_running:
             return
         self._respond_to_update = True
@@ -379,7 +383,12 @@ class RealtimeScoring(nanome.PluginInstance):
                 anchor.target = atom.index
                 self._spheres.append(sphere)
 
-        shapes.Sphere.upload_multiple(self._spheres)
+        async def upload_multiple_coro(shapes):
+            """upload multiple call as a coroutine"""
+            Shape.upload_multiple(shapes)
+
+        task = asyncio.create_task(upload_multiple_coro(self._spheres))
+        await task
         self._sphere_count = len(self._spheres)
         if self._sphere_count >= self._atom_count:
             self._uploading_spheres = False
@@ -387,12 +396,13 @@ class RealtimeScoring(nanome.PluginInstance):
                 self._creating_streams = False
                 self.clear_sphere_streams()
                 if not self._stop_after_deleting_spheres:
-                    self.get_full_complexes()
+                    await self.get_full_complexes()
             else:
                 self._creating_streams = True
                 self.setup_streams(self._curr_complex_list)
 
-    def complex_updated(self, complex_list, complex):
+    @async_callback
+    async def complex_updated(self, complex_list, complex):
         if not self._is_running:
             return
         if not self._respond_to_update:
