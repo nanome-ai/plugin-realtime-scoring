@@ -9,8 +9,6 @@ import functools
 import subprocess
 import tempfile
 import itertools
-import stat
-import time
 from timeit import default_timer as timer
 
 from .SettingsMenu import SettingsMenu
@@ -34,7 +32,7 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 class RealtimeScoring(nanome.PluginInstance):
     def benchmark_start(self, fn_name):
-        if not fn_name in self._benchmarks:
+        if fn_name not in self._benchmarks:
             self._benchmarks[fn_name] = [0, 0, 0]
         self._benchmarks[fn_name][0] = timer()
 
@@ -43,9 +41,8 @@ class RealtimeScoring(nanome.PluginInstance):
         time = timer() - entry[0]
         entry[1] += time
         entry[2] += 1
-        avg = entry[1] / entry[2]
-
-        #nanome.util.Logs.debug('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
+        # avg = entry[1] / entry[2]
+        # nanome.util.Logs.debug('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
 
     def start(self):
         self._benchmarks = {}
@@ -134,7 +131,7 @@ class RealtimeScoring(nanome.PluginInstance):
             self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             self._dsx_running = True
             self.benchmark_start("dsx")
-        except:
+        except Exception:
             nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
             return
 
@@ -339,7 +336,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     scales.append(0)
                 try:
                     self._scale_stream.update(scales)
-                except:
+                except Exception:
                     Logs.error("Trying to update stream w/ incorrect size")
             # destroy spheres
             for i in range(len(self._spheres)):
@@ -417,14 +414,13 @@ class RealtimeScoring(nanome.PluginInstance):
         self._atom_indices = []
         for i in range(len(self._spheres)):
             self._sphere_indices.append(self._spheres[i].index)
-        if self._color_stream == None or self._scale_stream == None:
-            indices = []
+        if self._color_stream is None or self._scale_stream is None:
             for complex in complex_list:
                 for atom in complex.atoms:
                     self._atom_indices.append(atom.index)
 
             def on_stream_ready(complex_list):
-                if self._color_stream != None and self._scale_stream != None and not (self.settings._labels ^ (self._label_stream != None)):
+                if self._color_stream is not None and self._scale_stream is not None and not (self.settings._labels ^ (self._label_stream is not None)):
                     self._streams_ready = True
                     self._to_display = True
                     self.get_updated_complexes()
@@ -477,7 +473,7 @@ class RealtimeScoring(nanome.PluginInstance):
             self._nanobabel_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self._nanobabel_running = True
             self.benchmark_start("nanobabel")
-        except:
+        except Exception:
             nanome.util.Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return
 
@@ -533,20 +529,20 @@ class RealtimeScoring(nanome.PluginInstance):
                 last_tuple = ireceptor_iligand
                 last_arr.append(score)
 
-                if score_min == None or score < score_min:
+                if score_min is None or score < score_min:
                     score_min = score
-                if score_max == None or score > score_max:
+                if score_max is None or score > score_max:
                     score_max = score
                 line_index += 1
 
             if score_max is None or score_min is None:
                 continue
-            score_gap = max(score_max - score_min, 0.01)
+            # score_gap = max(score_max - score_min, 0.01)
             try:
                 for atom_tuple, score_arr in scores.items():
                     score = sum(score_arr) / len(score_arr)
-                    bfactor = ((score - score_min) / score_gap) * BFACTOR_GAP + BFACTOR_MIN
-                    bfactor_two = score / (-score_min if score < 0 else score_max)
+                    # bfactor = ((score - score_min) / score_gap) * BFACTOR_GAP + BFACTOR_MIN
+                    # bfactor_two = score / (-score_min if score < 0 else score_max)
                     molecule = self._ligands._molecules[atom_tuple[0] - 1 + ligand_index]
                     if not hasattr(molecule, "atom_score_limits"):
                         molecule.atom_score_limits = [float('inf'), float('-inf')]
@@ -557,7 +553,7 @@ class RealtimeScoring(nanome.PluginInstance):
 
                     atom = next(itertools.islice(molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
                     atom.score = score
-            except:
+            except Exception:
                 err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
                 self.send_notification(NotificationTypes.error, err_msg)
                 nanome.util.Logs.error(err_msg)
@@ -602,7 +598,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     self._label_stream.update(labels)
                 self._color_stream.update(colors)
                 self._scale_stream.update(scales)
-        except:
+        except Exception:
             Logs.error("Error while updating sphere stream")
 
     def display_results(self):
@@ -610,7 +606,7 @@ class RealtimeScoring(nanome.PluginInstance):
             return
         self._ls_results.items = []
 
-        #scores = []
+        # scores = []
         scores = []
         pcss = []
         with open(RESULTS_PATH) as results_file:
@@ -622,7 +618,7 @@ class RealtimeScoring(nanome.PluginInstance):
                 if results[res_line_i] == '\n':
                     break
                 result = results[res_line_i].split('|')
-                name = result[1].strip()
+                # name = result[1].strip()
                 score = result[3].strip()
                 pcs = result[5].strip()
                 scores.append(score)
