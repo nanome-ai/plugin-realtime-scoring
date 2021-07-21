@@ -329,7 +329,7 @@ class RealtimeScoring(nanome.PluginInstance):
         self._streams_ready = False
 
         scales = []
-        if self._spheres != []:
+        if self._spheres:
             if streams_ready:
                 # make all spheres transparent so user can't see deletion process
                 for i in range(len(self._spheres)):
@@ -338,9 +338,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     self._scale_stream.update(scales)
                 except Exception:
                     Logs.error("Trying to update stream w/ incorrect size")
-            # destroy spheres
-            for i in range(len(self._spheres)):
-                self._spheres[i].destroy()
+            Shape.destroy_multiple(self._spheres)
             self._spheres.clear()
         self._sphere_count = 0
         self._atom_count = 0
