@@ -1,5 +1,5 @@
 import nanome
-import nanome.api.shapes as shapes
+from nanome.api.shapes import Shape, Sphere
 from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 
@@ -338,9 +338,7 @@ class RealtimeScoring(nanome.PluginInstance):
                     self._scale_stream.update(scales)
                 except Exception:
                     Logs.error("Trying to update stream w/ incorrect size")
-            # destroy spheres
-            for i in range(len(self._spheres)):
-                self._spheres[i].destroy()
+            Shape.destroy_multiple(self._spheres)
             self._spheres.clear()
         self._sphere_count = 0
         self._atom_count = 0
@@ -364,18 +362,17 @@ class RealtimeScoring(nanome.PluginInstance):
                 curr_atoms = complex.atoms
             for atom in curr_atoms:
                 self._atom_count += 1
-                sphere = shapes.Sphere()
+                sphere = Sphere()
                 sphere.color = nanome.util.Color(100, 100, 100, 120)
                 sphere.radius = 1.3
                 anchor = sphere.anchors[0]
                 anchor.anchor_type = nanome.util.enums.ShapeAnchorType.Atom
                 anchor.target = atom.index
                 self._spheres.append(sphere)
-        for i in range(self._atom_count):
-            self._spheres[i].upload(self.on_shape_created)
+        Shape.upload_multiple(self._spheres, self.on_shape_created)
 
     def on_shape_created(self, success):
-        self._sphere_count += 1
+        self._sphere_count = len(self._spheres)
         if self._sphere_count >= self._atom_count:
             self._uploading_spheres = False
             if self._delete_spheres:
