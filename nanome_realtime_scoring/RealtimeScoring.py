@@ -374,7 +374,7 @@ class RealtimeScoring(nanome.PluginInstance):
             Shape.upload_multiple(self._spheres, self.on_shape_created)
 
     def on_shape_created(self, success):
-        self._sphere_count += 1
+        self._sphere_count = len(self._spheres)
         if self._sphere_count >= self._atom_count:
             self._uploading_spheres = False
             if self._delete_spheres:
