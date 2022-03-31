@@ -1,4 +1,4 @@
-from nanome_realtime_scoring import RealtimeScoring
+from plugin import RealtimeScoring
 
 if __name__ == '__main__':
     RealtimeScoring.main()

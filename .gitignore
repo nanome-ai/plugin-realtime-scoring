@@ -1,5 +1,5 @@
 __pycache__
-nanome_realtime_scoring/dsx/results.txt
+plugin/dsx/results.txt
 /.vscode
 /docker/.cachebust
 /docker/redeploy.sh
