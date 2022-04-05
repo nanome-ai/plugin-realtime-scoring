@@ -3,14 +3,16 @@
 echo "./deploy.sh $*" > redeploy.sh
 chmod +x redeploy.sh
 
-existing=$(docker ps -aq -f name=realtime-scoring)
+container_name=realtime-scoring
+existing=$(docker ps -aq -f name=$container_name)
 if [ -n "$existing" ]; then
     echo "removing existing container"
     docker rm -f $existing
 fi
 
 docker run -d \
---name realtime-scoring \
+--name $container_name \
 --restart unless-stopped \
+-h $(hostname)-$container_name \
 -e ARGS="$*" \
-realtime-scoring
+$container_name
