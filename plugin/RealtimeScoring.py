@@ -31,6 +31,7 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 
 class RealtimeScoring(nanome.PluginInstance):
+
     def benchmark_start(self, fn_name):
         if fn_name not in self._benchmarks:
             self._benchmarks[fn_name] = [0, 0, 0]
