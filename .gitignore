@@ -8,3 +8,4 @@ plugin/dsx/results.txt
 *.pdb
 *.sdf
 *dsx*.txt
+.env*

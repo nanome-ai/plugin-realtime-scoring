@@ -30,7 +30,7 @@ DIR = os.path.dirname(__file__)
 RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 
-class RealtimeScoring(nanome.PluginInstance):
+class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def benchmark_start(self, fn_name):
         if fn_name not in self._benchmarks:
@@ -295,16 +295,17 @@ class RealtimeScoring(nanome.PluginInstance):
         index_list = [self._receptor_index] + self._ligand_indices
         self.request_complexes(index_list, set_complexes)
 
-    def reassign_complexes_and_setup_streams(self, complexes):
+    async def reassign_complexes_and_setup_streams(self, complexes):
         for complex in complexes:
             for atom in complex.atoms:
                 atom._old_position = atom.position
         self._complexes = [self._complexes[0]] + complexes
         self.setup_spheres(complexes)
 
-    def get_last_n_complexes(self, n, complexes_shallow):
+    async def get_last_n_complexes(self, n, complexes_shallow):
         complex_indices = [complex.index for complex in complexes_shallow[-n:]]
-        self.request_complexes(complex_indices, self.reassign_complexes_and_setup_streams)
+        complex_list = await self.request_complexes(complex_indices)
+        self.reassign_complexes_and_setup_streams(complex_list)
 
     def get_updated_complexes(self):
         self.benchmark_stop("total")
