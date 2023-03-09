@@ -10,8 +10,11 @@ def dsx_parse(dsx_output_path, ligand_comp):
 
     scores = dict()
     ligand_lines = []
+    scores_found = False
     while find_next_ligand(dsx_output_lines):
-        ligand_lines = parse_ligand_lines(dsx_output_lines)        
+        ligand_lines = parse_ligand_lines(dsx_output_lines)
+        if ligand_lines:
+            scores_found = True
         for line in ligand_lines:
             line_items = line.split("__")
             atom_items = line_items[1].split("_")
@@ -35,7 +38,8 @@ def dsx_parse(dsx_output_path, ligand_comp):
             ligand_molecule.atom_score_limits[1] = max(ligand_molecule.atom_score_limits[1], score)
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom.score = score
-
+    if not scores_found:
+        raise Exception("No scores found in DSX output")
 
 
 def parse_ligand_lines(dsx_output_lines):
@@ -68,10 +72,6 @@ def parse_scores(self, dsx_output):
     number_of_lines = len(lines)
     line_index = 0
     if not find_next_ligand():
-        # Logs.error("Couldn't parse DSX scores")
-        # Logs.error("Output:\n" + str(dsx_output))
-        err_msg = "Error parsing scores. Are the ligand and receptor selected correctly?"
-        # self.send_notification(NotificationTypes.error, err_msg)
         self.stop_scoring()
         self.clear_sphere_streams()
         return
@@ -174,4 +174,4 @@ def parse_scores(self, dsx_output):
             self._color_stream.update(colors)
             self._scale_stream.update(scales)
     except Exception:
-        Logs.error("Error while updating sphere stream")
+        print("Error while updating sphere stream")

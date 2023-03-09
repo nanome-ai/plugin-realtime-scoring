@@ -29,15 +29,13 @@ class MainMenu:
         self._pfb_result = nanome.ui.LayoutNode()
         self._pfb_result.add_new_label()
 
-    def button_pressed(self, button):
-        if self.plugin._is_running:
-            self.stop_scoring()
-        else:
-            receptor_index = self._receptor_index
-            ligand_indices = self._ligand_indices
-            self.start_scoring(receptor_index, ligand_indices)
+    @async_callback
+    async def button_pressed(self, button):
+        receptor_index = self._receptor_index
+        ligand_indices = self._ligand_indices
+        await self.start_scoring(receptor_index, ligand_indices)
 
-    def start_scoring(self, receptor_index, ligand_indices):
+    async def start_scoring(self, receptor_index, ligand_indices):
         Logs.message("Start Scoring")
         self.freeze_button()
         self._p_selection.enabled = False
@@ -53,7 +51,7 @@ class MainMenu:
             self.unfreeze_button("Start scoring")
             return
 
-        self.plugin.start_scoring(receptor_index, ligand_indices)
+        await self.plugin.score_ligand(receptor_index, ligand_indices)
         self._menu.title = "Scores"
         # self.hide_scores()
 

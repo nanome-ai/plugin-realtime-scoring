@@ -8,11 +8,10 @@ import shlex
 import functools
 import subprocess
 import tempfile
-import itertools
-from timeit import default_timer as timer
 
 from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
+from .dsx_parser import dsx_parse
 from nanome.util import async_callback
 
 SDF_OPTIONS = nanome.api.structure.Complex.io.SDFSaveOptions()
@@ -39,30 +38,34 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.settings = SettingsMenu(self)
 
     async def score_ligand(self, receptor_index, ligand_indices):
+        # Get latest version of receptor and ligand
         deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
         for i in range(0, len(deep_comps)):
             comp = deep_comps[i]
+            comp_index = comp.index
             comp.locked = True
-            deep_comps[i] = comp.convert_to_frames()
-        self.update_structures_deep(deep_comps)
+            # deep_comps[i] = comp.convert_to_frames()
+            deep_comps[i].index = comp_index
+        # self.update_structures_deep(deep_comps)
         receptor_comp = deep_comps[0]
-        assert sum(1 for _ in receptor_comp.atoms) > 0
         ligand_comps = deep_comps[1:]
+        # Generate sphere streams
         spheres = self.generate_spheres(ligand_comps)
         receptor_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
-        ligand_pdbs = []
         receptor_comp.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
+        # For each ligand, generate a PDB file and run DSX
         for ligand_comp in ligand_comps:
-            ligand_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
-            output_txt = tempfile.NamedTemporaryFile(suffix='.txt')
-            ligand_comp.io.to_pdb(ligand_pdb.name, PDB_OPTIONS)
-            ligand_pdbs.append(ligand_pdb)
-            dsx_popen = self.dsx_start(receptor_pdb.name, ligand_pdb.name, output_txt.name)
-            return_code = dsx_popen.wait()
-            assert return_code == 0, 'DSX failed with return code: {}'.format(return_code)
-            self.parse_scores(output_txt.name)
-            # self.benchmark_stop('parse_dsx')
-            os.unlink(ligand_pdb.name)
+            ligand_sdf = tempfile.NamedTemporaryFile(suffix='.sdf')
+            ligand_mol2 = tempfile.NamedTemporaryFile(suffix='.mol2')
+            dsx_output_txt = tempfile.NamedTemporaryFile(suffix='.txt')
+            ligand_comp.io.to_sdf(ligand_sdf.name, SDF_OPTIONS)
+            # Convert ligand pdb to a mol2.
+            self.nanobabel_convert(ligand_sdf.name, ligand_mol2.name) 
+            dsx_popen = self.dsx_start(receptor_pdb.name, ligand_mol2.name, dsx_output_txt.name)
+            dsx_popen.wait()
+            # Make sure scores are added to ligand atoms
+            dsx_parse(dsx_output_txt.name, ligand_comp)
+            assert any(hasattr(atom, 'score') for atom in ligand_comp.atoms), 'No scores found in DSX output'
 
     @staticmethod
     def generate_spheres(ligand_comps):
@@ -80,22 +83,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 spheres.append(sphere)
         return spheres
 
-    def benchmark_start(self, fn_name):
-        if fn_name not in self._benchmarks:
-            self._benchmarks[fn_name] = [0, 0, 0]
-        self._benchmarks[fn_name][0] = timer()
-
-    def benchmark_stop(self, fn_name):
-        entry = self._benchmarks[fn_name]
-        time = timer() - entry[0]
-        entry[1] += time
-        entry[2] += 1
-        # avg = entry[1] / entry[2]
-        # nanome.util.Logs.debug('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
-
     @async_callback
     async def start(self):
-        self._benchmarks = {}
         self._protein_input = tempfile.NamedTemporaryFile(delete=False, suffix=".pdb")
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligands_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
@@ -138,8 +127,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self._scores_ready = False
         self._creating_streams = False
         self._stop_after_deleting_spheres = False
-
-        self.benchmark_start("total")
 
         self._respond_to_update = False
         self.get_full_complexes(receptor_index, ligand_indices)
@@ -264,9 +251,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.reassign_complexes_and_setup_streams(complex_list)
 
     def get_updated_complexes(self):
-        self.benchmark_stop("total")
-        self.benchmark_start("total")
-
         def update_complexes(complex_list):
             # update self._complexes positions from shallow list
             for complex in self._complexes:
@@ -275,11 +259,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                         complex.position = thing.position
                         complex.rotation = thing.rotation
                         break
-
-            self.benchmark_stop("update")
             self.prepare_complexes(self._complexes)
-
-        self.benchmark_start("update")
         self.request_complex_list(update_complexes)
 
     def clear_sphere_streams(self):
@@ -419,15 +399,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         receptor.io.to_pdb(self._protein_input.name, PDB_OPTIONS)
         ligands.io.to_sdf(self._ligands_input.name, SDF_OPTIONS)
 
-        self.nanobabel_start()
-
-    def nanobabel_start(self):
-        cmd = f'nanobabel convert -i {self._ligands_input.name} -o {self._ligands_converted.name}'
+    def nanobabel_convert(self, input_file, output_file):
+        cmd = f'nanobabel convert -i {input_file} -o {output_file}'
         args = shlex.split(cmd)
         try:
-            self._nanobabel_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            self._nanobabel_running = True
-            self.benchmark_start("nanobabel")
+            popen = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            popen.wait()
         except Exception:
             nanome.util.Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return

@@ -44,15 +44,15 @@ class RealtimeScoringTestCase(unittest.TestCase):
         nanome._internal.network.plugin_network.PluginNetwork._instance = MagicMock()
 
 
-    def test_start_scoring(self):
-        async def validate_start_scoring(self):
+    def test_score_ligand(self):
+        async def validate_score_ligand(self):
             receptor_index = self.receptor_comp.index
             ligand_indices = [self.ligand_comp.index]
             request_complexes_fut = asyncio.Future()
             request_complexes_fut.set_result([self.receptor_comp, self.ligand_comp])
             self.plugin.request_complexes = MagicMock(return_value=request_complexes_fut)
             await self.plugin.score_ligand(receptor_index, ligand_indices)
-        run_awaitable(validate_start_scoring, self)
+        run_awaitable(validate_score_ligand, self)
     
     def test_dsx_parser(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')
