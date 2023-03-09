@@ -141,4 +141,3 @@ class MainMenu:
         self._is_button_loading = False
         self._btn_score.text.value.set_all(text)
         self.plugin.update_menu(self._menu)
-

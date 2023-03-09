@@ -24,7 +24,7 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 
 class RealtimeScoring(nanome.AsyncPluginInstance):
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._is_running = False

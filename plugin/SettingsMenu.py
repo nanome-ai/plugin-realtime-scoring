@@ -31,7 +31,7 @@ class SettingsMenu():
                 button.set_all_text("on")
                 self.show_total = True
             self._plugin.update_content(button)
-        
+
         def pcs_pressed(button):
             if self.show_total:
                 button.set_all_text("off")
@@ -45,12 +45,12 @@ class SettingsMenu():
         self._btn_total.register_pressed_callback(total_pressed)
         self._btn_pcs = self._menu.root.find_node("PCS Button", True).get_content()
         self._btn_pcs.register_pressed_callback(pcs_pressed)
-    
+
     def open_menu(self, menu=None):
         self._plugin.menu = self._menu
         self._plugin.menu.enabled = True
         self._plugin.update_menu(self._plugin.menu)
-    
+
     def score_all_frames(self):
         return self._score_all_frames
 

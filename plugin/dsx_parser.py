@@ -1,4 +1,4 @@
-import itertools 
+import itertools
 
 
 __all__ = ['dsx_parse']
@@ -36,6 +36,7 @@ def dsx_parse(dsx_output_path, ligand_comp):
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom.score = score
 
+
 def parse_ligand_lines(dsx_output_lines):
     ligand_lines = []
     endline = "# End of pair potentials"
@@ -48,6 +49,7 @@ def parse_ligand_lines(dsx_output_lines):
             break
     return ligand_lines
 
+
 def find_next_ligand(line_list):
     ligand_line_start = "# Receptor-Ligand:"
     starting_line_index = 0
@@ -58,8 +60,9 @@ def find_next_ligand(line_list):
             starting_line_index = i
             ligand_found = True
             break
-    del line_list[:starting_line_index]   
+    del line_list[:starting_line_index]
     return ligand_found
+
 
 def parse_scores(self, dsx_output):
     lines = dsx_output.splitlines()

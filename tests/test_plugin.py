@@ -55,7 +55,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.plugin.request_complexes = MagicMock(return_value=request_complexes_fut)
             await self.plugin.score_ligand(receptor_index, ligand_indices)
         run_awaitable(validate_score_ligand, self)
-    
+
     def test_dsx_parser(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')
         for atom in self.ligand_comp.atoms:
