@@ -1,11 +1,6 @@
-__pycache__
-plugin/dsx/results.txt
-/.vscode
-/docker/.cachebust
-/docker/redeploy.sh
-*.log
-*.mol2
-*.pdb
-*.sdf
-*dsx*.txt
-.env*
+*
+!docker
+!tests
+!plugin
+!.github
+
