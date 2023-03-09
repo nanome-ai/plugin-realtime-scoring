@@ -56,4 +56,12 @@ class RealtimeScoringTestCase(unittest.TestCase):
     
     def test_dsx_parser(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')
-        dsx_parse(results_file, self.receptor_comp, self.ligand_comp)
+        for atom in self.ligand_comp.atoms:
+            self.assertTrue(not hasattr(atom, 'score'))
+        dsx_parse(results_file, self.ligand_comp)
+        expected_atoms_with_scores = 29
+        score_found = 0
+        for atom in self.ligand_comp.atoms:
+            if hasattr(atom, 'score'):
+                score_found += 1
+        self.assertEqual(score_found, expected_atoms_with_scores)

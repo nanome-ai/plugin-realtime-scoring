@@ -4,16 +4,14 @@ import itertools
 __all__ = ['dsx_parse']
 
 
-def dsx_parse(dsx_output_path, receptor_comp, ligand_comp):
+def dsx_parse(dsx_output_path, ligand_comp):
     with open(dsx_output_path, 'r') as f:
         dsx_output_lines = f.readlines()
 
     scores = dict()
     ligand_lines = []
     while find_next_ligand(dsx_output_lines):
-        ligand_lines = parse_ligand_lines(dsx_output_lines)
-        ligand_atoms = ligand_comp.atoms
-        
+        ligand_lines = parse_ligand_lines(dsx_output_lines)        
         for line in ligand_lines:
             line_items = line.split("__")
             atom_items = line_items[1].split("_")
@@ -31,15 +29,13 @@ def dsx_parse(dsx_output_path, receptor_comp, ligand_comp):
         if not hasattr(ligand_molecule, "atom_score_limits"):
             ligand_molecule.atom_score_limits = [float('inf'), float('-inf')]
 
-        breakpoint()
         for atom_tuple, score_arr in scores.items():
             score = sum(score_arr) / len(score_arr)
             ligand_molecule.atom_score_limits[0] = min(ligand_molecule.atom_score_limits[0], score)
             ligand_molecule.atom_score_limits[1] = max(ligand_molecule.atom_score_limits[1], score)
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom.score = score
-    breakpoint()
-    print('done')
+
 
 
 def parse_ligand_lines(dsx_output_lines):
@@ -53,7 +49,6 @@ def parse_ligand_lines(dsx_output_lines):
             ligand_lines.pop(-1)
             break
     return ligand_lines
-
 
 def find_next_ligand(line_list):
     ligand_line_start = "# Receptor-Ligand:"
@@ -135,8 +130,8 @@ def parse_scores(self, dsx_output):
                 atom.score = score
         except Exception:
             err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
-            self.send_notification(NotificationTypes.error, err_msg)
-            nanome.util.Logs.error(err_msg)
+            # self.send_notification(NotificationTypes.error, err_msg)
+            # nanome.util.Logs.error(err_msg)
             self.stop_scoring()
             return
 
