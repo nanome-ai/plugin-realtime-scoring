@@ -5,7 +5,7 @@ from nanome.util import Logs, async_callback
 from nanome.util.enums import NotificationTypes
 
 BASE_PATH = path.dirname(f'{path.realpath(__file__)}')
-MENU_PATH = path.join(BASE_PATH, 'menu.json')
+MENU_PATH = path.join(BASE_PATH, 'menu_json', 'menu.json')
 
 
 class MainMenu:

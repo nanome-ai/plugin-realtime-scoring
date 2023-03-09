@@ -1,17 +1,21 @@
 import nanome
+import os
 from nanome.api.ui.image import Image as Image
 
-import os
+
+BASE_PATH = os.path.dirname(f'{os.path.realpath(__file__)}')
+MENU_PATH = os.path.join(BASE_PATH, 'menu_json', 'settings.json')
+
 
 class SettingsMenu():
+
     def __init__(self, plugin):
         self._plugin = plugin
         self._labels = False
         self._score_all_frames = False
         self.show_total = True
         self.show_pcs = True
-
-        self._menu = nanome.ui.Menu.io.from_json(os.path.join(os.path.dirname(__file__), 'settings.json'))
+        self._menu = nanome.ui.Menu.io.from_json(MENU_PATH)
         # self._menu.register_closed_callback(closed_callback)
 
         self._btn_labels = self._menu.root.find_node('AtomLabelsButton').get_content()

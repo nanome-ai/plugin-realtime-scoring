@@ -1,6 +1,6 @@
 import nanome
 from nanome.api.shapes import Shape, Sphere
-from nanome.util import Logs
+from nanome.util import Logs, Color, enums
 from nanome.util.enums import NotificationTypes
 
 import os
@@ -37,6 +37,50 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         super().__init__(*args, **kwargs)
         self._is_running = False
         self.settings = SettingsMenu(self)
+
+    async def score_ligand(self, receptor_index, ligand_indices):
+        deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
+        for i in range(0, len(deep_comps)):
+            comp = deep_comps[i]
+            comp.locked = True
+            deep_comps[i] = comp.convert_to_frames()
+        self.update_structures_deep(deep_comps)
+        receptor_comp = deep_comps[0]
+        assert sum(1 for _ in receptor_comp.atoms) > 0
+        ligand_comps = deep_comps[1:]
+        spheres = self.generate_spheres(ligand_comps)
+        receptor_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+        ligand_pdbs = []
+        receptor_comp.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
+        for ligand_comp in ligand_comps:
+            ligand_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+            output_txt = tempfile.NamedTemporaryFile(suffix='.txt')
+            ligand_comp.io.to_pdb(ligand_pdb.name, PDB_OPTIONS)
+            ligand_pdbs.append(ligand_pdb)
+            dsx_popen = self.dsx_start(receptor_pdb.name, ligand_pdb.name, output_txt.name)
+            return_code = dsx_popen.wait()
+            breakpoint()
+            assert return_code == 0, 'DSX failed with return code: {}'.format(return_code)
+
+            self.parse_scores(output_txt.name)
+            # self.benchmark_stop('parse_dsx')
+            os.unlink(ligand_pdb.name)
+
+    @staticmethod
+    def generate_spheres(ligand_comps):
+        spheres = []
+        for comp in ligand_comps:
+            molecule_list = list(comp.molecules)
+            curr_atoms = molecule_list[comp.current_frame].atoms
+            for atom in curr_atoms:
+                sphere = Sphere()
+                sphere.color = Color(100, 100, 100, 120)
+                sphere.radius = 1.1
+                anchor = sphere.anchors[0]
+                anchor.anchor_type = enums.ShapeAnchorType.Atom
+                anchor.target = atom.index
+                spheres.append(sphere)
+        return spheres
 
     def benchmark_start(self, fn_name):
         if fn_name not in self._benchmarks:
@@ -115,35 +159,24 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.menu.enabled = True
         self.update_menu(self.menu)
 
-    def dsx_start(self):
+    @staticmethod
+    def dsx_start(receptor_pdb, ligands_pdb, output_file):
         dsx_path = os.path.join(DIR, 'dsx', 'dsx_linux_64.lnx')
-        dsx_args = [dsx_path, '-P', self._protein_input.name, '-L', self._ligands_converted.name, '-D', 'pdb_pot_0511', '-pp', '-F', 'results.txt']
+        dsx_args = [
+            dsx_path,
+            '-P', receptor_pdb,
+            '-L', ligands_pdb,
+            '-D', 'pdb_pot_0511',
+            '-pp',
+            '-F',
+            output_file
+        ]
         try:
-            self._dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-            self._dsx_running = True
-            self.benchmark_start("dsx")
+            dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'dsx'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         except Exception:
             nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
             return
-
-    def update(self):
-        if not self._is_running:
-            return
-
-        if self._nanobabel_running:
-            if self._nanobabel_process.poll() is not None:
-                self.benchmark_stop("nanobabel")
-                self._nanobabel_running = False
-                self.dsx_start()
-        elif self._dsx_running:
-            if self._dsx_process.poll() is not None:
-                self.benchmark_stop("dsx")
-                self._dsx_running = False
-
-                self.get_updated_complexes()
-                dsx_output, _ = self._dsx_process.communicate()
-                self.parse_scores(dsx_output)
-                # self.display_results()
+        return dsx_process
 
     def on_complex_added(self):
         self.request_complex_list(self.update_lists)
@@ -401,21 +434,17 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             nanome.util.Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return
 
-    def parse_scores(self, dsx_output):
-        lines = dsx_output.splitlines()
-        number_of_lines = len(lines)
+    def parse_scores(self, dsx_output_path):
+        with open(dsx_output_path, 'r') as f:
+            dsx_output_lines = f.readlines()
+        breakpoint()
+        number_of_lines = len(dsx_output_lines)
 
         line_index = 0
-
-        def find_next_ligand():
-            nonlocal line_index
-            while line_index < number_of_lines - 1:
-                if lines[line_index].startswith("# Receptor-Ligand:"):
-                    line_index += 1
-                    return True
-                line_index += 1
-            return False
-
+        for line in dsx_output_lines:
+            print(line)
+            print(line.split())
+        
         if not find_next_ligand():
             Logs.error("Couldn't parse DSX scores")
             Logs.error("Output:\n" + str(dsx_output))
