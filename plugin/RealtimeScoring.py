@@ -59,9 +59,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             ligand_pdbs.append(ligand_pdb)
             dsx_popen = self.dsx_start(receptor_pdb.name, ligand_pdb.name, output_txt.name)
             return_code = dsx_popen.wait()
-            breakpoint()
             assert return_code == 0, 'DSX failed with return code: {}'.format(return_code)
-
             self.parse_scores(output_txt.name)
             # self.benchmark_stop('parse_dsx')
             os.unlink(ligand_pdb.name)
@@ -433,126 +431,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         except Exception:
             nanome.util.Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return
-
-    def parse_scores(self, dsx_output_path):
-        with open(dsx_output_path, 'r') as f:
-            dsx_output_lines = f.readlines()
-        breakpoint()
-        number_of_lines = len(dsx_output_lines)
-
-        line_index = 0
-        for line in dsx_output_lines:
-            print(line)
-            print(line.split())
-        
-        if not find_next_ligand():
-            Logs.error("Couldn't parse DSX scores")
-            Logs.error("Output:\n" + str(dsx_output))
-            err_msg = "Error parsing scores. Are the ligand and receptor selected correctly?"
-            self.send_notification(NotificationTypes.error, err_msg)
-            self.stop_scoring()
-            self.clear_sphere_streams()
-            return
-
-        ligand_index = 0
-        has_next_ligand = True
-        while has_next_ligand:
-            scores = dict()
-            last_tuple = None
-            last_arr = None
-            score_min = None
-            score_max = None
-
-            while line_index < number_of_lines - 1:
-                line = lines[line_index]
-                if line.startswith("# End of pair potentials"):
-                    has_next_ligand = find_next_ligand()
-                    break
-                line_items = line.split("__")
-                atom_items = line_items[1].split("_")
-                score = float(line_items[2])
-                ireceptor_iligand = (int(atom_items[1]), int(atom_items[2]))
-
-                if last_tuple != ireceptor_iligand:
-                    if ireceptor_iligand in scores:
-                        last_arr = scores[ireceptor_iligand]
-                    else:
-                        last_arr = []
-                        scores[ireceptor_iligand] = last_arr
-                last_tuple = ireceptor_iligand
-                last_arr.append(score)
-
-                if score_min is None or score < score_min:
-                    score_min = score
-                if score_max is None or score > score_max:
-                    score_max = score
-                line_index += 1
-
-            if score_max is None or score_min is None:
-                continue
-            # score_gap = max(score_max - score_min, 0.01)
-            try:
-                for atom_tuple, score_arr in scores.items():
-                    score = sum(score_arr) / len(score_arr)
-                    # bfactor = ((score - score_min) / score_gap) * BFACTOR_GAP + BFACTOR_MIN
-                    # bfactor_two = score / (-score_min if score < 0 else score_max)
-                    molecule = self._ligands._molecules[atom_tuple[0] - 1 + ligand_index]
-                    if not hasattr(molecule, "atom_score_limits"):
-                        molecule.atom_score_limits = [float('inf'), float('-inf')]
-                    if score < molecule.atom_score_limits[0]:
-                        molecule.atom_score_limits[0] = score
-                    elif score > molecule.atom_score_limits[1]:
-                        molecule.atom_score_limits[1] = score
-
-                    atom = next(itertools.islice(molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
-                    atom.score = score
-            except Exception:
-                err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
-                self.send_notification(NotificationTypes.error, err_msg)
-                nanome.util.Logs.error(err_msg)
-                self.stop_scoring()
-                return
-
-            ligand_index += 1
-
-        labels = []
-        colors = []
-        scales = []
-        for atom in self._ligands.atoms:
-            red = 0
-            green = 0
-            blue = 0
-            alpha = 141
-            if hasattr(atom, "score"):
-                ligand = atom.molecule
-                denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
-                norm_score = atom.score / denominator
-                red = 255 if norm_score > 0 else 0
-                green = 255 if -norm_score >= 0 else 0
-                red_scale = int(max(norm_score * 255, 0))
-                green_scale = int(max(-norm_score * 255, 0))
-                scale = max(green_scale, red_scale) / 255. + 1
-            else:
-                norm_score = 0.0
-                green = 0
-                red = 255
-                scale = 1
-
-            labels.append(f'{norm_score:.3f}')
-            colors.append(red)
-            colors.append(green)
-            colors.append(blue)
-            colors.append(alpha)
-            scales.append(scale)
-
-        try:
-            if self._streams_ready:
-                if self._label_stream:
-                    self._label_stream.update(labels)
-                self._color_stream.update(colors)
-                self._scale_stream.update(scales)
-        except Exception:
-            Logs.error("Error while updating sphere stream")
 
     def display_results(self):
         if (not self._to_display):
