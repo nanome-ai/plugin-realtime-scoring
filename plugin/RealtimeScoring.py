@@ -12,7 +12,8 @@ import itertools
 from timeit import default_timer as timer
 
 from .SettingsMenu import SettingsMenu
-
+from .menu import MainMenu
+from nanome.util import async_callback
 
 SDF_OPTIONS = nanome.api.structure.Complex.io.SDFSaveOptions()
 SDF_OPTIONS.write_bonds = True
@@ -31,6 +32,11 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 
 class RealtimeScoring(nanome.AsyncPluginInstance):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._is_running = False
+        self.settings = SettingsMenu(self)
 
     def benchmark_start(self, fn_name):
         if fn_name not in self._benchmarks:
@@ -45,46 +51,21 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         # avg = entry[1] / entry[2]
         # nanome.util.Logs.debug('{:>10}    {:.2f}    (avg {:.2f})'.format(fn_name, time, avg))
 
-    def start(self):
+    @async_callback
+    async def start(self):
         self._benchmarks = {}
-
         self._protein_input = tempfile.NamedTemporaryFile(delete=False, suffix=".pdb")
         self._ligands_input = tempfile.NamedTemporaryFile(delete=False, suffix=".sdf")
         self._ligands_converted = tempfile.NamedTemporaryFile(delete=False, suffix=".mol2")
-
-        def button_pressed(button):
-            if not self._is_button_loading:
-                if self._is_running:
-                    self.stop_scoring()
-                else:
-                    self.start_scoring()
-
-        self._menu = nanome.ui.Menu.io.from_json(os.path.join(DIR, 'menu.json'))
-        self.menu = self._menu
-        self.settings = SettingsMenu(self, self.open_menu)
-
-        self._p_selection = self._menu.root.find_node("Selection Panel", True)
-        self._p_results = self._menu.root.find_node("Results Panel", True)
-        self._ls_receptors = self._menu.root.find_node("Receptor List", True).get_content()
-        self._ls_ligands = self._menu.root.find_node("Ligands List", True).get_content()
-        self._ls_results = self._p_results.get_content()
-        self._btn_score = self._menu.root.find_node("Button", True).get_content()
-        self._btn_score.register_pressed_callback(button_pressed)
-
-        self._pfb_complex = nanome.ui.LayoutNode()
-        self._pfb_complex.add_new_button()
-
-        self._pfb_result = nanome.ui.LayoutNode()
-        self._pfb_result.add_new_label()
-
         self._is_running = False
+        self._menu = MainMenu(self)
+        self.menu = self._menu
         self._nanobabel_running = False
         self._dsx_running = False
 
         self._ligands = None
         self._receptor_index = None
         self._ligand_indices = []
-        self._ligand_names = []
         self._complexes = []
         self._spheres = []
         self._sphere_count = 0
@@ -102,15 +83,24 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self._delete_spheres = False
         self._stop_after_deleting_spheres = False
         self._respond_to_update = True
-
-        self.menu.enabled = True
-        self.update_menu(self.menu)
-
-        self.request_complex_list(self.update_lists)
+        self.complex_list = await self.request_complex_list()
 
     def on_run(self):
-        self.menu.enabled = True
-        self.update_menu(self.menu)
+        self.menu.render(self.complex_list)
+
+    def start_scoring(self, receptor_index, ligand_indices):
+        self._is_running = True
+        self._nanobabel_running = False
+        self._dsx_running = False
+
+        self._scores_ready = False
+        self._creating_streams = False
+        self._stop_after_deleting_spheres = False
+
+        self.benchmark_start("total")
+
+        self._respond_to_update = False
+        self.get_full_complexes(receptor_index, ligand_indices)
 
     def on_advanced_settings(self):
         self.settings.open_menu()
@@ -153,74 +143,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 self.get_updated_complexes()
                 dsx_output, _ = self._dsx_process.communicate()
                 self.parse_scores(dsx_output)
-                self.display_results()
+                # self.display_results()
 
     def on_complex_added(self):
         self.request_complex_list(self.update_lists)
 
     def on_complex_removed(self):
         self.request_complex_list(self.update_lists)
-
-    def hide_scores(self, show_ligand_names=False):
-        self._to_display = False
-        self._ls_results.items = []
-        if show_ligand_names:
-            for i in range(len(self._ligand_names)):
-                clone = self._pfb_result.clone()
-                lbl = clone._get_content()
-                lbl.text_value = '{}: {}'.format(self._ligand_names[i], "Loading scores")
-                self._ls_results.items.append(clone)
-            self.update_content(self._ls_results)
-        else:
-            clone = self._pfb_result.clone()
-            lbl = clone._get_content()
-            lbl.text_value = ''
-            self._ls_results.items.append(clone)
-            self.update_content(self._ls_results)
-
-    def freeze_button(self):
-        self._is_button_loading = True
-        self._btn_score.text.value.set_all("Loading...")
-        self.update_menu(self.menu)
-
-    def unfreeze_button(self, text):
-        self._is_button_loading = False
-        self._btn_score.text.value.set_all(text)
-        self.update_menu(self.menu)
-
-    def start_scoring(self):
-        self.freeze_button()
-
-        if self._receptor_index is None:
-            self.send_notification(NotificationTypes.error, "Please select a receptor")
-            self.unfreeze_button("Start scoring")
-            return
-
-        if len(self._ligand_indices) == 0:
-            self.send_notification(NotificationTypes.error, "Please select at least one ligand")
-            self.unfreeze_button("Start scoring")
-            return
-
-        self.menu.title = "Scores"
-        self.hide_scores()
-
-        self._is_running = True
-        self._nanobabel_running = False
-        self._dsx_running = False
-
-        self._p_selection.enabled = False
-        self._p_results.enabled = True
-
-        self.update_menu(self.menu)
-
-        self._scores_ready = False
-        self._creating_streams = False
-        self._stop_after_deleting_spheres = False
-
-        self.benchmark_start("total")
-
-        self._respond_to_update = False
-        self.get_full_complexes()
 
     def stop_scoring(self):
         self.freeze_button()
@@ -238,21 +167,18 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             self.clear_sphere_streams()
 
         self.menu.title = "Realtime Scoring"
-        self._p_selection.enabled = True
         self._p_results.enabled = False
         self._is_button_loading = False
         self._btn_score.text.value.set_all("Start scoring")
         self.request_complex_list(self.update_lists)
         self.update_menu(self.menu)
+        self.menu.unfreeze_button("Start scoring")
 
-        self.unfreeze_button("Start scoring")
-
-    def get_full_complexes(self):
+    def get_full_complexes(self, receptor_index, ligand_indices):
 
         def set_complexes(complex_list):
             self._respond_to_update = True
             self._complexes = complex_list
-            self._ligand_names = []
             self._ligand_atom_counts = {}
             self._ligand_frames = {}
             atom_counts = [0 for _ in range(len(complex_list))]
@@ -277,7 +203,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                         return
                     self._ligand_frames[complex.index] = complex.current_frame
                     self._ligand_atom_counts[complex.index] = atom_counts[complex_i]
-                    self._ligand_names.append(complex_list[complex_i].full_name)
                     for residue in complex_list[complex_i].residues:
                         residue.labeled = False
                     for atom in complex_list[complex_i].atoms:
@@ -286,13 +211,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     complex_updated_callback = functools.partial(self.complex_updated, complex_list[1:])
                     complex_list[complex_i].register_complex_updated_callback(complex_updated_callback)
 
-            self.unfreeze_button("Stop scoring")
-            self.hide_scores(True)
+            # self.unfreeze_button("Stop scoring")
+            # self.menu.hide_scores(True)
             self._respond_to_update = False
             self.update_structures_deep(complex_list[0:], functools.partial(self.request_complexes, index_list[1:], self.setup_spheres))
 
         self._respond_to_update = True
-        index_list = [self._receptor_index] + self._ligand_indices
+        index_list = [receptor_index] + ligand_indices
         self.request_complexes(index_list, set_complexes)
 
     async def reassign_complexes_and_setup_streams(self, complexes):
@@ -398,12 +323,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             if self._uploading_spheres:
                 self._respond_to_update = False
                 self._delete_spheres = True
-                self.hide_scores(True)
+                # self.menu.hide_scores(True)
             elif self._creating_streams:
                 self._respond_to_update = False
                 self._creating_streams = False
                 self.clear_sphere_streams()
-                self.hide_scores(True)
+                # self.menu.hide_scores(True)
                 self.get_full_complexes()
             else:
                 self._respond_to_update = True
@@ -641,56 +566,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 lbl.text_value = format_str.format(self._ligand_names[i])
             self._ls_results.items.append(clone)
         self.update_content(self._ls_results)
-
-    def update_lists(self, complex_list):
-        if self._is_running:
-            return
-
-        self._shallow_complexes = complex_list
-
-        def update_selected_ligands():
-            self._ligand_indices = []
-            for item in self._ls_ligands.items:
-                btn = item.get_content()
-                if btn.selected:
-                    self._ligand_indices.append(btn.index)
-
-        def receptor_pressed(receptor):
-            for item in self._ls_receptors.items:
-                item.get_content().selected = False
-
-            receptor.selected = True
-            self._receptor_index = receptor.index
-
-            for item in self._ls_ligands.items:
-                ligand = item.get_content()
-                ligand.unusable = receptor.index == ligand.index
-                if ligand.selected and ligand.unusable:
-                    ligand.selected = False
-            update_selected_ligands()
-
-            self.update_menu(self.menu)
-
-        def ligand_pressed(ligand):
-            ligand.selected = not ligand.selected
-            self.update_content(ligand)
-            update_selected_ligands()
-
-        def populate_list(ls, cb):
-            ls.items = []
-            for complex in complex_list:
-                clone = self._pfb_complex.clone()
-                btn = clone.get_content()
-                btn.text.value.set_all(complex.full_name)
-                btn.index = complex.index
-                btn.register_pressed_callback(cb)
-                ls.items.append(clone)
-            self.update_content(ls)
-
-        self._receptor_index = None
-        self._ligand_indices = []
-        populate_list(self._ls_receptors, receptor_pressed)
-        populate_list(self._ls_ligands, ligand_pressed)
 
 
 def main():

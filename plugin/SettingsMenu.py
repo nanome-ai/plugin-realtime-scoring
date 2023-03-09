@@ -4,15 +4,15 @@ from nanome.api.ui.image import Image as Image
 import os
 
 class SettingsMenu():
-    def __init__(self, docking_plugin, closed_callback):
-        self._plugin = docking_plugin
+    def __init__(self, plugin):
+        self._plugin = plugin
         self._labels = False
         self._score_all_frames = False
         self.show_total = True
         self.show_pcs = True
 
         self._menu = nanome.ui.Menu.io.from_json(os.path.join(os.path.dirname(__file__), 'settings.json'))
-        self._menu.register_closed_callback(closed_callback)
+        # self._menu.register_closed_callback(closed_callback)
 
         self._btn_labels = self._menu.root.find_node('AtomLabelsButton').get_content()
         self._btn_labels.register_pressed_callback(self.toggle_labels)
