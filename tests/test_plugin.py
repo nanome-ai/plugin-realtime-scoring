@@ -43,6 +43,8 @@ class RealtimeScoringTestCase(unittest.TestCase):
         self.plugin._network = MagicMock()
         nanome._internal.network.plugin_network.PluginNetwork._instance = MagicMock()
 
+    def tearDown(self):
+        self.plugin.temp_dir.cleanup()
 
     def test_score_ligand(self):
         async def validate_score_ligand(self):

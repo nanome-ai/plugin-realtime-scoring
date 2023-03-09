@@ -10,11 +10,8 @@ def dsx_parse(dsx_output_path, ligand_comp):
 
     scores = dict()
     ligand_lines = []
-    scores_found = False
     while find_next_ligand(dsx_output_lines):
         ligand_lines = parse_ligand_lines(dsx_output_lines)
-        if ligand_lines:
-            scores_found = True
         for line in ligand_lines:
             line_items = line.split("__")
             atom_items = line_items[1].split("_")
@@ -38,9 +35,6 @@ def dsx_parse(dsx_output_path, ligand_comp):
             ligand_molecule.atom_score_limits[1] = max(ligand_molecule.atom_score_limits[1], score)
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom.score = score
-    if not scores_found:
-        raise Exception("No scores found in DSX output")
-
 
 def parse_ligand_lines(dsx_output_lines):
     ligand_lines = []
