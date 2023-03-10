@@ -1,7 +1,6 @@
 import nanome
 from nanome.api.shapes import Shape, Sphere
 from nanome.util import Logs, Color, enums
-from nanome.util.enums import NotificationTypes
 
 import os
 import shlex
@@ -41,18 +40,30 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             # Update coordinates to be relative to workspace
             mat = comp.get_complex_to_workspace_matrix()
             for atom in comp.atoms:
+                atom._old_position = atom.position
                 atom.position = mat * atom.position
         receptor_comp = deep_comps[0]
         ligand_comps = deep_comps[1:]
         await self.calculate_scores(receptor_comp, ligand_comps)
+        # Reset ligand coordinates and ensure labels are enabled if settings say so
+        for comp in deep_comps:
+            for atom in comp.atoms:
+                atom.position = atom._old_position
+                if comp in ligand_comps and self.settings._labels:
+                    atom.labeled = atom.label_text != 'N/A'
+        self.update_structures_deep(deep_comps)
 
     async def calculate_scores(self, receptor_comp, ligand_comps):
         # Generate sphere and attach streams
         spheres = self.generate_spheres(ligand_comps)
         await Shape.upload_multiple(spheres)
         self.sphere_indices = [sphere.index for sphere in spheres]
-        # if self.settings._labels:
-        #    self.create_writing_stream(self._atom_indices, enums.StreamType.label)
+        if self.settings._labels:
+            atom_indices = []
+            for comp in ligand_comps:
+                for atom in comp.atoms:
+                    atom_indices.append(atom.index)
+            self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(self.sphere_indices, enums.StreamType.shape_color)
         # create streams
         receptor_pdb = tempfile.NamedTemporaryFile(delete=False, suffix='.pdb')
@@ -71,6 +82,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             color_stream_data = self.get_color_stream_data(ligand_comp)
             self.color_stream.update(color_stream_data)
             Logs.message("Updated color stream")
+            if self.settings._labels:
+                label_stream_data = self.get_label_stream_data(ligand_comp)
+                self.label_stream.update(label_stream_data)
+                Logs.message("Updated label stream")
 
     @staticmethod
     def get_color_stream_data(comp):
@@ -98,6 +113,20 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             data.append(green)
             data.append(blue)
             data.append(alpha)
+        return data
+
+    @staticmethod
+    def get_label_stream_data(comp):
+        """Generate color stream data based on atom scores.
+        
+        This assumes score values have been added to each atom,
+        and atom_score_limits on the molecule
+        """
+        data = []
+        for atom in comp.atoms:
+            atom_score = getattr(atom, 'score', None)
+            label_text = str(round(atom_score, 2)) if atom_score else 'N/A'
+            data.append(label_text)            
         return data
 
     @staticmethod
