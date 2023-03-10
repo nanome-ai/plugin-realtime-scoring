@@ -16,6 +16,7 @@ class SettingsMenu():
         self.show_total = True
         self.show_pcs = True
         self._menu = nanome.ui.Menu.io.from_json(MENU_PATH)
+        self._menu.index = 120  # arbitrary
         # self._menu.register_closed_callback(closed_callback)
 
         self._btn_labels = self._menu.root.find_node('AtomLabelsButton').get_content()

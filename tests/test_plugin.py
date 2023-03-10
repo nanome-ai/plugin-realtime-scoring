@@ -3,7 +3,7 @@ import nanome
 import os
 import unittest
 import itertools
-from nanome.api import structure, PluginInstance
+from nanome.api import structure, PluginInstance, shapes
 from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
 from unittest.mock import MagicMock
@@ -50,10 +50,25 @@ class RealtimeScoringTestCase(unittest.TestCase):
         async def validate_score_ligand(self):
             receptor_index = self.receptor_comp.index
             ligand_indices = [self.ligand_comp.index]
+
+            # Mock sShapes upload_multiple call
+            upload_multiple_fut = asyncio.Future()
+            upload_multiple_fut.set_result(None)
+            shapes.Shape.upload_multiple = MagicMock(return_value=upload_multiple_fut)
+            # Mock request complexes call
             request_complexes_fut = asyncio.Future()
             request_complexes_fut.set_result([self.receptor_comp, self.ligand_comp])
             self.plugin.request_complexes = MagicMock(return_value=request_complexes_fut)
+
+            # Mock create stream call
+            create_writing_stream_fut = asyncio.Future()
+            stream_mock = MagicMock()
+            create_writing_stream_fut.set_result((stream_mock, MagicMock()))
+            self.plugin.create_writing_stream = MagicMock(return_value=create_writing_stream_fut)
+            # Run score ligand
             await self.plugin.score_ligand(receptor_index, ligand_indices)
+            # Assert update called on stream
+            stream_mock.update.assert_called_once()
         run_awaitable(validate_score_ligand, self)
 
     def test_dsx_parser(self):
@@ -61,7 +76,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
         for atom in self.ligand_comp.atoms:
             self.assertTrue(not hasattr(atom, 'score'))
         dsx_parse(results_file, self.ligand_comp)
-        expected_atoms_with_scores = 29
+        expected_atoms_with_scores = 28
         score_found = 0
         for atom in self.ligand_comp.atoms:
             if hasattr(atom, 'score'):

@@ -44,12 +44,15 @@ def dsx_parse(dsx_output_path, ligand_comp):
 def parse_ligand_lines(dsx_output_lines):
     ligand_lines = []
     endline = "# End of pair potentials"
+    receptor_ligand_line = '# Receptor-Ligand'
     while True:
         try:
             line = dsx_output_lines.pop(0)
         except IndexError:
             break
-        if line.startswith(endline):
+        if line.startswith(receptor_ligand_line):
+            continue
+        elif line.startswith(endline):
             # Pop empty line with '----------\n'
             ligand_lines.pop(-1)
             break

@@ -5,7 +5,6 @@ from nanome.util.enums import NotificationTypes
 
 import os
 import shlex
-import functools
 import subprocess
 import tempfile
 
@@ -13,7 +12,7 @@ from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
 from .dsx_parser import dsx_parse
 from nanome.util import async_callback
-
+from nanome.api import streams
 SDF_OPTIONS = nanome.api.structure.Complex.io.SDFSaveOptions()
 SDF_OPTIONS.write_bonds = True
 PDB_OPTIONS = nanome.api.structure.Complex.io.PDBSaveOptions()
@@ -71,7 +70,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             color_stream_data = self.get_color_stream_data(ligand_comp)
             self.color_stream.update(color_stream_data)
             Logs.message("Updated color stream")
-            # Add spheres to ligand
 
     @staticmethod
     def get_color_stream_data(comp):
@@ -100,19 +98,17 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             data.append(alpha)
         return data
 
-
-
-
     @staticmethod
     def generate_spheres(ligand_comps):
+        """Create a sphere for each atom on each ligand"""
         spheres = []
         for comp in ligand_comps:
             molecule_list = list(comp.molecules)
             curr_atoms = molecule_list[comp.current_frame].atoms
             for atom in curr_atoms:
                 sphere = Sphere()
-                sphere.color = Color(100, 100, 100, 10)
-                sphere.radius = 1.1
+                sphere.color = Color(100, 100, 100, 0)
+                sphere.radius = 1.0
                 anchor = sphere.anchors[0]
                 anchor.anchor_type = enums.ShapeAnchorType.Atom
                 anchor.target = atom.index
@@ -127,18 +123,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     async def on_run(self):
         complex_list = await self.request_complex_list()
         self.menu.render(complex_list)
-
-    def start_scoring(self, receptor_index, ligand_indices):
-        self._is_running = True
-        self._nanobabel_running = False
-        self._dsx_running = False
-
-        self._scores_ready = False
-        self._creating_streams = False
-        self._stop_after_deleting_spheres = False
-
-        self._respond_to_update = False
-        self.get_full_complexes(receptor_index, ligand_indices)
 
     def on_advanced_settings(self):
         self.settings.open_menu()
@@ -179,28 +163,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def on_complex_removed(self):
         self.request_complex_list(self.update_lists)
-
-    def complex_updated(self, complex_list, complex):
-        if not self._is_running:
-            return
-        if not self._respond_to_update:
-            return
-        molecule_list = list(complex.molecules)
-        atom_count = len(list(molecule_list[complex.current_frame].atoms))
-        if self._ligand_frames[complex.index] != complex.current_frame or \
-           self._ligand_atom_counts[complex.index] != atom_count:
-            if self._uploading_spheres:
-                self._respond_to_update = False
-                self._delete_spheres = True
-                # self.menu.hide_scores(True)
-            elif self._creating_streams:
-                self._respond_to_update = False
-                self._creating_streams = False
-                self.clear_sphere_streams()
-                # self.menu.hide_scores(True)
-                self.get_full_complexes()
-            else:
-                self._respond_to_update = True
 
     def nanobabel_convert(self, input_file, output_file):
         cmd = f'nanobabel convert -i {input_file} -o {output_file}'
