@@ -45,8 +45,15 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         # self.update_structures_deep(deep_comps)
         receptor_comp = deep_comps[0]
         ligand_comps = deep_comps[1:]
-        # Generate sphere streams
+        # Generate sphere and attach streams
         spheres = self.generate_spheres(ligand_comps)
+        await Shape.upload_multiple(spheres)
+        self.sphere_indices = [sphere.index for sphere in spheres]
+        # if self.settings._labels:
+        #         self.create_writing_stream(self._atom_indices, enums.StreamType.label)
+        self.color_stream, _ = await self.create_writing_stream(self.sphere_indices, enums.StreamType.shape_color)
+        # self.radius_stream = self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
+        # create streams
         receptor_pdb = tempfile.NamedTemporaryFile(delete=False, suffix='.pdb')
         receptor_comp.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
         # For each ligand, generate a PDB file and run DSX
@@ -61,6 +68,40 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             # Make sure scores are added to ligand atoms
             dsx_parse(dsx_output_txt.name, ligand_comp)
             assert any(hasattr(atom, 'score') for atom in ligand_comp.atoms), 'No scores found in DSX output'
+            color_stream_data = self.get_color_stream_data(ligand_comp)
+            self.color_stream.update(color_stream_data)
+            Logs.message("Updated color stream")
+            # Add spheres to ligand
+
+    @staticmethod
+    def get_color_stream_data(comp):
+        """Generate color stream data based on atom scores.
+        
+        This assumes score values have been added to each atom,
+        and atom_score_limits on the molecule
+        """
+        data = []
+        for atom in comp.atoms:
+            atom_score = getattr(atom, 'score', False)
+            if not atom_score:
+                continue
+            red = 0
+            green = 0
+            blue = 0
+            alpha = 141
+            ligand = atom.molecule
+            denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
+            norm_score = atom.score / denominator
+            red = 255 if norm_score > 0 else 0
+            green = 255 if -norm_score >= 0 else 0
+            data.append(red)
+            data.append(green)
+            data.append(blue)
+            data.append(alpha)
+        return data
+
+
+
 
     @staticmethod
     def generate_spheres(ligand_comps):
@@ -70,7 +111,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             curr_atoms = molecule_list[comp.current_frame].atoms
             for atom in curr_atoms:
                 sphere = Sphere()
-                sphere.color = Color(100, 100, 100, 120)
+                sphere.color = Color(100, 100, 100, 10)
                 sphere.radius = 1.1
                 anchor = sphere.anchors[0]
                 anchor.anchor_type = enums.ShapeAnchorType.Atom

@@ -14,7 +14,11 @@ def dsx_parse(dsx_output_path, ligand_comp):
         ligand_lines = parse_ligand_lines(dsx_output_lines)
         for line in ligand_lines:
             line_items = line.split("__")
-            atom_items = line_items[1].split("_")
+            try:
+                atom_items = line_items[1].split("_")
+            except IndexError:
+                print("Error parsing line: ", line)
+                continue
             score = float(line_items[2])
             ireceptor_iligand = (int(atom_items[1]), int(atom_items[2]))
             if ireceptor_iligand not in scores:
@@ -41,12 +45,16 @@ def parse_ligand_lines(dsx_output_lines):
     ligand_lines = []
     endline = "# End of pair potentials"
     while True:
-        line = dsx_output_lines.pop(0)
-        ligand_lines.append(dsx_output_lines.pop(0))
+        try:
+            line = dsx_output_lines.pop(0)
+        except IndexError:
+            break
         if line.startswith(endline):
             # Pop empty line with '----------\n'
             ligand_lines.pop(-1)
             break
+        else:
+            ligand_lines.append(line)
     return ligand_lines
 
 
@@ -126,7 +134,7 @@ def parse_scores(self, dsx_output):
                 atom = next(itertools.islice(molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
                 atom.score = score
         except Exception:
-            err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
+            # err_msg = "Error parsing ligand scores. Are your ligands missing bonds?"
             # self.send_notification(NotificationTypes.error, err_msg)
             # nanome.util.Logs.error(err_msg)
             self.stop_scoring()
