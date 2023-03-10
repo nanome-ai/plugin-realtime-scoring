@@ -38,20 +38,22 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             comp_index = comp.index
             comp.locked = True
             deep_comps[i].index = comp_index
+            # Update coordinates to be relative to workspace
             mat = comp.get_complex_to_workspace_matrix()
             for atom in comp.atoms:
                 atom.position = mat * atom.position
-        # self.update_structures_deep(deep_comps)
         receptor_comp = deep_comps[0]
         ligand_comps = deep_comps[1:]
+        await self.calculate_scores(receptor_comp, ligand_comps)
+
+    async def calculate_scores(self, receptor_comp, ligand_comps):
         # Generate sphere and attach streams
         spheres = self.generate_spheres(ligand_comps)
         await Shape.upload_multiple(spheres)
         self.sphere_indices = [sphere.index for sphere in spheres]
         # if self.settings._labels:
-        #         self.create_writing_stream(self._atom_indices, enums.StreamType.label)
+        #    self.create_writing_stream(self._atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(self.sphere_indices, enums.StreamType.shape_color)
-        # self.radius_stream = self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
         # create streams
         receptor_pdb = tempfile.NamedTemporaryFile(delete=False, suffix='.pdb')
         receptor_comp.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
@@ -66,7 +68,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             self.run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_output_txt.name)
             # Make sure scores are added to ligand atoms
             dsx_parse(dsx_output_txt.name, ligand_comp)
-            assert any(hasattr(atom, 'score') for atom in ligand_comp.atoms), 'No scores found in DSX output'
             color_stream_data = self.get_color_stream_data(ligand_comp)
             self.color_stream.update(color_stream_data)
             Logs.message("Updated color stream")
@@ -81,17 +82,18 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         data = []
         for atom in comp.atoms:
             atom_score = getattr(atom, 'score', False)
-            if not atom_score:
-                continue
             red = 0
             green = 0
             blue = 0
-            alpha = 141
+            alpha = 0
             ligand = atom.molecule
-            denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
-            norm_score = atom.score / denominator
-            red = 255 if norm_score > 0 else 0
-            green = 255 if -norm_score >= 0 else 0
+            if atom_score:
+                denominator = -ligand.atom_score_limits[0] if atom.score < 0 else ligand.atom_score_limits[1]
+                norm_score = atom.score / denominator
+                red = 255 if norm_score > 0 else 0
+                green = 255 if norm_score < 0 else 0
+                alpha = int(140 * abs(norm_score))
+                Logs.debug(f'{atom_score}: {alpha}')
             data.append(red)
             data.append(green)
             data.append(blue)
