@@ -38,8 +38,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             comp = deep_comps[i]
             comp_index = comp.index
             comp.locked = True
-            # deep_comps[i] = comp.convert_to_frames()
             deep_comps[i].index = comp_index
+            mat = comp.get_complex_to_workspace_matrix()
+            for atom in comp.atoms:
+                atom.position = mat * atom.position
         # self.update_structures_deep(deep_comps)
         receptor_comp = deep_comps[0]
         ligand_comps = deep_comps[1:]
@@ -55,8 +57,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             ligand_comp.io.to_sdf(ligand_sdf.name, SDF_OPTIONS)
             dsx_output_txt = tempfile.NamedTemporaryFile(suffix='.txt')
             self.nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
-            dsx_popen = self.dsx_start(receptor_pdb.name, ligand_mol2.name, dsx_output_txt.name)
-            dsx_popen.wait()
+            self.run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_output_txt.name)
             # Make sure scores are added to ligand atoms
             dsx_parse(dsx_output_txt.name, ligand_comp)
             assert any(hasattr(atom, 'score') for atom in ligand_comp.atoms), 'No scores found in DSX output'
@@ -110,12 +111,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.update_menu(self.menu)
 
     @staticmethod
-    def dsx_start(receptor_pdb, ligands_pdb, output_file):
+    def run_dsx(receptor_pdb, ligands_mol2, output_file):
+        "Run DSX and write output to provided output_file."
         dsx_path = os.path.join(DIR, 'dsx', 'dsx_linux_64.lnx')
         dsx_args = [
             dsx_path,
             '-P', receptor_pdb,
-            '-L', ligands_pdb,
+            '-L', ligands_mol2,
             '-D', 'pdb_pot_0511',
             '-pp',
             '-F',
@@ -126,7 +128,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         except Exception:
             nanome.util.Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
             return
-        return dsx_process
+        dsx_process.wait()
+        dsx_output, _ = dsx_process.communicate()
+        with open(output_file, 'w') as f:
+            f.write(dsx_output)
 
     def on_complex_added(self):
         self.request_complex_list(self.update_lists)
