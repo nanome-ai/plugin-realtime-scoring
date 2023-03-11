@@ -11,7 +11,7 @@ class SettingsMenu():
 
     def __init__(self, plugin):
         self._plugin = plugin
-        self._labels = True
+        self._labels = False
         self._score_all_frames = False
         self.show_total = True
         self.show_pcs = True

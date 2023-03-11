@@ -1,5 +1,6 @@
 import asyncio
 import nanome
+from nanome.util import enums
 import os
 import unittest
 import itertools
@@ -46,12 +47,13 @@ class RealtimeScoringTestCase(unittest.TestCase):
     def tearDown(self):
         self.plugin.temp_dir.cleanup()
 
-    def test_score_ligand(self):
-        async def validate_score_ligand(self):
+    def test_score_ligands_labels(self):
+        async def validate_score_ligands_labels(self):
+            self.plugin.settings._labels = True
             receptor_index = self.receptor_comp.index
             ligand_indices = [self.ligand_comp.index]
 
-            # Mock sShapes upload_multiple call
+            # Mock Shapes upload_multiple call
             upload_multiple_fut = asyncio.Future()
             upload_multiple_fut.set_result(None)
             shapes.Shape.upload_multiple = MagicMock(return_value=upload_multiple_fut)
@@ -63,13 +65,14 @@ class RealtimeScoringTestCase(unittest.TestCase):
             # Mock create stream call
             create_writing_stream_fut = asyncio.Future()
             stream_mock = MagicMock()
-            create_writing_stream_fut.set_result((stream_mock, MagicMock()))
+            create_writing_stream_fut.set_result((stream_mock, unittest.mock.ANY))
             self.plugin.create_writing_stream = MagicMock(return_value=create_writing_stream_fut)
             # Run score ligand
-            await self.plugin.score_ligand(receptor_index, ligand_indices)
+            await self.plugin.score_ligands(receptor_index, ligand_indices)
             # Assert update called on stream
-            stream_mock.update.assert_called_once()
-        run_awaitable(validate_score_ligand, self)
+            self.plugin.create_writing_stream.assert_called_with(
+                unittest.mock.ANY, enums.StreamType.shape_color)
+        run_awaitable(validate_score_ligands_labels, self)
 
     def test_dsx_parser(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')

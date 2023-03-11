@@ -36,10 +36,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         spheres = self.generate_spheres(ligand_atoms)
         await Shape.upload_multiple(spheres)
         atom_indices = [atom.index for atom in ligand_atoms]
-        self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         sphere_indices = [sphere.index for sphere in spheres]
+        self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
-    
+
     @staticmethod
     def get_atoms(comp_list):
         """Return a chain object whose .__next__() method returns elements from the first iterable until it is exhausted,
