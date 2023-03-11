@@ -51,7 +51,7 @@ class MainMenu:
             self.unfreeze_button("Start scoring")
             return
 
-        await self.plugin.score_ligand(receptor_index, ligand_indices)
+        await self.plugin.score_ligands(receptor_index, ligand_indices)
         self._menu.title = "Scores"
         # self.hide_scores()
 
@@ -66,8 +66,6 @@ class MainMenu:
         self.plugin.update_menu(self._menu)
 
     def update_lists(self, complex_list):
-        if self.plugin._is_running:
-            return
 
         self._shallow_complexes = complex_list
 
