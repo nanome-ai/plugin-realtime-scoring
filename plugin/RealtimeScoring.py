@@ -70,8 +70,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 atoms_changed = sum(1 for _ in cached_comp.atoms) != sum(1 for _ in updated_comp.atoms)
                 if position_changed:
                     needs_rescore = True
-                    break
-                elif atoms_changed:
+                if atoms_changed:
                     needs_rescore = True
                     needs_stream_update = True
                     break
