@@ -30,13 +30,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.settings = SettingsMenu(self)
         self.temp_dir = tempfile.TemporaryDirectory()
 
-    async def start_ligand_streams(self, ligand_atoms):
+    async def start_ligand_streams(self, ligand_atoms, spheres):
         """Set up streams and Shapes used for rendering scoring results."""
-        spheres = self.generate_spheres(ligand_atoms)
-        await Shape.upload_multiple(spheres)
         atom_indices = [atom.index for atom in ligand_atoms]
+        sphere_indices = [sphere.index for sphere in spheres]
         self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
-        self.color_stream, _ = await self.create_writing_stream(self.sphere_indices, enums.StreamType.shape_color)
+        self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
 
     @staticmethod
     def get_atoms(comp_list):
@@ -60,8 +59,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 atom.position = mat * atom.position
         self.receptor_comp = deep_comps[0]
         self.ligand_comps = deep_comps[1:]
-        await self.start_ligand_streams(self.ligand_atoms)
-        await self.score_ligands()
+
+        spheres = self.generate_spheres(self.ligand_atoms)
+        await Shape.upload_multiple(spheres)
+        await self.start_ligand_streams(self.ligand_atoms, spheres)
 
     async def score_ligands(self):
         if not getattr(self, 'receptor_comp', None):

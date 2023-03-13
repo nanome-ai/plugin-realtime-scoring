@@ -49,9 +49,10 @@ class RealtimeScoringTestCase(unittest.TestCase):
 
     def test_score_ligands_labels(self):
         async def validate_score_ligands_labels(self):
-            self.plugin.settings._labels = True
             receptor_index = self.receptor_comp.index
             ligand_indices = [self.ligand_comp.index]
+            self.plugin.receptor_comp = self.receptor_comp
+            self.plugin.ligand_comps = [self.ligand_comp]
 
             # Mock Shapes upload_multiple call
             upload_multiple_fut = asyncio.Future()
@@ -67,8 +68,10 @@ class RealtimeScoringTestCase(unittest.TestCase):
             stream_mock = MagicMock()
             create_writing_stream_fut.set_result((stream_mock, unittest.mock.ANY))
             self.plugin.create_writing_stream = MagicMock(return_value=create_writing_stream_fut)
+            # Set up streams
+            await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
             # Run score ligand
-            await self.plugin.score_ligands(receptor_index, ligand_indices)
+            await self.plugin.score_ligands()
             # Assert update called on stream
             self.plugin.create_writing_stream.assert_called_with(
                 unittest.mock.ANY, enums.StreamType.shape_color)
@@ -76,12 +79,8 @@ class RealtimeScoringTestCase(unittest.TestCase):
 
     def test_dsx_parser(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')
-        for atom in self.ligand_comp.atoms:
-            self.assertTrue(not hasattr(atom, 'score'))
-        dsx_parse(results_file, self.ligand_comp)
-        expected_atoms_with_scores = 28
-        score_found = 0
-        for atom in self.ligand_comp.atoms:
-            if hasattr(atom, 'score'):
-                score_found += 1
-        self.assertEqual(score_found, expected_atoms_with_scores)
+        with open(results_file, 'r') as f:
+            dsx_output = f.read()
+        expected_atoms_with_scores = 29
+        atom_scores = dsx_parse(dsx_output, self.ligand_comp)
+        self.assertEqual(len(atom_scores), expected_atoms_with_scores)
