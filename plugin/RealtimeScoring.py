@@ -35,28 +35,24 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         spheres = self.generate_spheres(ligand_atoms)
         await Shape.upload_multiple(spheres)
         atom_indices = [atom.index for atom in ligand_atoms]
-        sphere_indices = [sphere.index for sphere in spheres]
         self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
-        self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
+        self.color_stream, _ = await self.create_writing_stream(self.sphere_indices, enums.StreamType.shape_color)
 
     @staticmethod
     def get_atoms(comp_list):
-        """Return a chain object whose .__next__() method returns elements from the first iterable until it is exhausted,
-        then elements from the next iterable, until all of the iterables are exhausted."""
+        """Yield all atoms from a list of complexes."""
         for comp in comp_list:
             for atom in comp.atoms:
                 yield atom
     
     @property
     def ligand_atoms(self):
-        """Return a chain object whose .__next__() method returns elements from the first iterable until it is exhausted,
-        then elements from the next iterable, until all of the iterables are exhausted."""
+        """Yield all atoms from all ligands."""
         return self.get_atoms(self.ligand_comps)
 
     async def setup_receptor_and_ligands(self, receptor_index, ligand_indices):
         deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
         for comp in deep_comps:
-            comp.locked = True
             # Update coordinates to be relative to workspace
             mat = comp.get_complex_to_workspace_matrix()
             for atom in comp.atoms:
@@ -107,6 +103,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         This assumes score values have been added to each atom,
         and atom_score_limits on the molecule
         score_data: list of tuples of (atom, atom_score)
+
+        Note: Technically the stream is tied to a Sphere, but
+        there is a sphere corresponding to every ligand atom, 
+        so using the atom index works just as well.
         """
         data = []
         scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
