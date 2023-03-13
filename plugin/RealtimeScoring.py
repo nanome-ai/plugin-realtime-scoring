@@ -111,15 +111,20 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         """
         data = []
         scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
-        min_score = min(scored_indices.values())
-        max_score = max(scored_indices.values())
+        try:
+            min_score = min(scored_indices.values())
+            max_score = max(scored_indices.values())
+        except ValueError:
+            # No scored atoms, still update colors
+            pass
+
         for atom in ligand_atoms:
             red = 0
             green = 0
             blue = 0
             alpha = 0
 
-            # Alpha used to define 
+            # Alpha used to indicate strong and weak scores
             max_alpha = 230
             atom_score = scored_indices.get(atom.index, False)
             if atom_score:
@@ -128,7 +133,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 red = 255 if norm_score > 0 else 0
                 blue = 255 if norm_score < 0 else 0
                 alpha = int(abs(norm_score * max_alpha))
-                Logs.debug(f'{atom_score}: {alpha}')
             data.extend((red, green, blue, alpha))
         return data
 
