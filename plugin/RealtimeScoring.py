@@ -33,10 +33,14 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.last_update = datetime.now()
         self.is_updating = False
 
-    async def start_ligand_streams(self, ligand_atoms, spheres):
+    async def start_ligand_streams(self, ligand_atoms):
         """Set up streams and Shapes used for rendering scoring results."""
+        if hasattr(self, 'spheres') and getattr(self, 'spheres', None):
+            await Shape.destroy_multiple(self.spheres)
+        self.spheres = self.generate_spheres(self.ligand_atoms)
+        await Shape.upload_multiple(self.spheres)
         atom_indices = [atom.index for atom in ligand_atoms]
-        sphere_indices = [sphere.index for sphere in spheres]
+        sphere_indices = [sphere.index for sphere in self.spheres]
         self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
 
@@ -59,17 +63,25 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             self.last_update = datetime.now()
             # Check if positions have changed in workspace
             needs_rescore = False
+            needs_stream_update = False
             cached_comps = [self.receptor_comp, *self.ligand_comps]
             for cached_comp, updated_comp in zip(cached_comps, updated_comps):
-                Logs.debug(f"Cached ligand position: {cached_comp.position}")
-                Logs.debug(f"Updated ligand position: {updated_comp.position}")
-                if cached_comp.position.unpack() != updated_comp.position.unpack():
+                position_changed = cached_comp.position.unpack() != updated_comp.position.unpack()
+                atoms_changed = sum(1 for _ in cached_comp.atoms) != sum(1 for _ in updated_comp.atoms)
+                if position_changed:
                     needs_rescore = True
+                    break
+                elif atoms_changed:
+                    needs_rescore = True
+                    needs_stream_update = True
                     break
             self.receptor_comp = updated_comps[0]
             self.ligand_comps = updated_comps[1:]
+            if needs_stream_update:
+                Logs.debug("Ligand has changed. Updating streams.")
+                await self.start_ligand_streams(self.ligand_atoms)
             if needs_rescore:
-                Logs.debug("Ligand has moved. Rescoring.")
+                Logs.debug("Rescoring Ligands.")
                 await self.score_ligands()    
             self.is_updating = False
 
@@ -100,9 +112,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.set_atoms_to_workspace_positions(deep_comps)
         self.receptor_comp = deep_comps[0]
         self.ligand_comps = deep_comps[1:]
-        self.spheres = self.generate_spheres(self.ligand_atoms)
-        await Shape.upload_multiple(self.spheres)
-        await self.start_ligand_streams(self.ligand_atoms, self.spheres)
+        await self.start_ligand_streams(self.ligand_atoms)
 
     async def score_ligands(self):
         if not getattr(self, 'receptor_comp', None):
