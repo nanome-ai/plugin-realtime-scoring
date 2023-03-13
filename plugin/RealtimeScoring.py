@@ -1,9 +1,10 @@
 import nanome
+import os
+import tempfile
+from datetime import datetime, timedelta
 from nanome.api.shapes import Shape, Sphere
 from nanome.util import Logs, Color, enums
 
-import os
-import tempfile
 
 from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
@@ -29,6 +30,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         super().__init__(*args, **kwargs)
         self.settings = SettingsMenu(self)
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.last_update = datetime.now()
+        self.is_updating = False
 
     async def start_ligand_streams(self, ligand_atoms, spheres):
         """Set up streams and Shapes used for rendering scoring results."""
@@ -36,6 +39,45 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         sphere_indices = [sphere.index for sphere in spheres]
         self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
+
+    @async_callback
+    async def update(self):
+        update_time_secs = 5
+        has_receptor = getattr(self, 'receptor_comp', None)
+        has_ligands = getattr(self, 'ligand_comps', None)
+        has_color_stream = getattr(self, 'color_stream', None)
+        has_label_stream = getattr(self, 'label_stream', None)
+        due_for_update = datetime.now() - self.last_update > timedelta(seconds=update_time_secs)
+        if all([
+            has_receptor,
+            has_ligands,
+            has_color_stream,
+            has_label_stream,
+            due_for_update,
+                not self.is_updating]):
+            Logs.debug("Updating cached ligands.")
+            self.is_updating = True
+            ligand_indices = [cmp.index for cmp in self.ligand_comps]
+            updated_ligands = await self.request_complexes(ligand_indices)
+            self.set_atoms_to_workspace_positions(updated_ligands)
+            self.last_update = datetime.now()
+            # Check if positions have changed in workspace
+            needs_rescore = False
+            for ligand, updated_ligand in zip(self.ligand_comps, updated_ligands):
+                Logs.debug(f"Cached ligand position: {ligand.position}")
+                Logs.debug(f"Updated ligand position: {updated_ligand.position}")
+                if ligand.position.unpack() != updated_ligand.position.unpack():
+                    needs_rescore = True
+                    break
+                # for atom, updated_atom in zip(ligand.atoms, updated_ligand.atoms):
+                #     if atom.position.unpack() != updated_atom.position.unpack():
+                #         needs_rescore = True
+                #         break
+            self.ligand_comps = updated_ligands
+            if needs_rescore:
+                Logs.debug("Ligand has moved. Rescoring.")
+                await self.score_ligands()    
+            self.is_updating = False
 
     @staticmethod
     def get_atoms(comp_list):
@@ -49,20 +91,24 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         """Yield all atoms from all ligands."""
         return self.get_atoms(self.ligand_comps)
 
-    async def setup_receptor_and_ligands(self, receptor_index, ligand_indices):
-        deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
-        for comp in deep_comps:
+    @staticmethod
+    def set_atoms_to_workspace_positions(comp_list):
+        """Set all atoms in a list of complexes to their positions in the workspace."""
+        for comp in comp_list:
             # Update coordinates to be relative to workspace
             mat = comp.get_complex_to_workspace_matrix()
             for atom in comp.atoms:
                 atom._old_position = atom.position
                 atom.position = mat * atom.position
+
+    async def setup_receptor_and_ligands(self, receptor_index, ligand_indices):
+        deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
+        self.set_atoms_to_workspace_positions(deep_comps)
         self.receptor_comp = deep_comps[0]
         self.ligand_comps = deep_comps[1:]
-
-        spheres = self.generate_spheres(self.ligand_atoms)
-        await Shape.upload_multiple(spheres)
-        await self.start_ligand_streams(self.ligand_atoms, spheres)
+        self.spheres = self.generate_spheres(self.ligand_atoms)
+        await Shape.upload_multiple(self.spheres)
+        await self.start_ligand_streams(self.ligand_atoms, self.spheres)
 
     async def score_ligands(self):
         if not getattr(self, 'receptor_comp', None):
@@ -73,17 +119,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             return
         score_data = await self.calculate_scores(self.receptor_comp, self.ligand_comps)
         await self.render_atom_scores(score_data)
-        # Reset ligand coordinates and ensure labels are enabled if settings say so
-        # for comp in deep_comps:
-        #     for atom in comp.atoms:
-        #         atom.position = atom._old_position
-        #         if comp in ligand_comps and self.settings._labels:
-        #             atom.labeled = atom.label_text != 'N/A'
-        # self.update_structures_deep(deep_comps)
 
     @classmethod
     async def calculate_scores(cls, receptor_comp, ligand_comps):
-        atom_scores = dsx_scoring.score_ligands(receptor_comp, ligand_comps)
+        atom_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
         return atom_scores
 
     async def render_atom_scores(self, score_data):
