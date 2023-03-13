@@ -118,13 +118,16 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             green = 0
             blue = 0
             alpha = 0
+
+            # Alpha used to define 
+            max_alpha = 230
             atom_score = scored_indices.get(atom.index, False)
             if atom_score:
                 denominator = -min_score if atom_score < 0 else max_score
                 norm_score = atom_score / denominator
                 red = 255 if norm_score > 0 else 0
-                green = 255 if norm_score < 0 else 0
-                alpha = int(140 * abs(norm_score))
+                blue = 255 if norm_score < 0 else 0
+                alpha = int(abs(norm_score * max_alpha))
                 Logs.debug(f'{atom_score}: {alpha}')
             data.extend((red, green, blue, alpha))
         return data
@@ -151,7 +154,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         for atom in ligand_atoms:
             sphere = Sphere()
             sphere.color = Color(100, 100, 100, 0)
-            sphere.radius = 1.0
+            sphere.radius = .75
             anchor = sphere.anchors[0]
             anchor.anchor_type = enums.ShapeAnchorType.Atom
             anchor.target = atom.index
