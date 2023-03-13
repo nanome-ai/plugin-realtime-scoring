@@ -207,6 +207,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             spheres.append(sphere)
         return spheres
 
+    def stop_streams(self):
+        self.color_stream.destroy()
+        self.label_stream.destroy()
+        self.color_stream = None
+        self.label_stream = None
+
     @async_callback
     async def start(self):
         self.menu = MainMenu(self)

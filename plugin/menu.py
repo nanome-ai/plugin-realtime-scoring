@@ -20,8 +20,9 @@ class MainMenu:
         self._ls_receptors: ui.UIList = self._menu.root.find_node("Receptor List", True).get_content()
         self._ls_ligands: ui.UIList = self._menu.root.find_node("Ligands List", True).get_content()
         self._ls_results: ui.UIList = self._p_results.get_content()
-        self._btn_score: ui.Button = self._menu.root.find_node("Button", True).get_content()
-        self._btn_score.register_pressed_callback(self.button_pressed)
+        self.btn_score: ui.Button = self._menu.root.find_node("btn_score", True).get_content()
+        self.btn_score.register_pressed_callback(self.button_pressed)
+        self.btn_score.toggle_on_press = True
 
         self._pfb_complex = nanome.ui.LayoutNode()
         self._pfb_complex.add_new_button()
@@ -33,22 +34,22 @@ class MainMenu:
     async def button_pressed(self, button):
         receptor_index = self._receptor_index
         ligand_indices = self._ligand_indices
-        await self.start_scoring(receptor_index, ligand_indices)
+        if button.selected:
+            await self.start_scoring(receptor_index, ligand_indices)
+        else:
+            self.stop_scoring()
 
     async def start_scoring(self, receptor_index, ligand_indices):
         Logs.message("Start Scoring")
-        self.freeze_button()
         self._p_selection.enabled = False
         self._p_results.enabled = True
 
         if receptor_index is None:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
-            self.unfreeze_button("Start scoring")
             return
 
         if len(self._ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
-            self.unfreeze_button("Start scoring")
             return
 
         await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
@@ -57,7 +58,10 @@ class MainMenu:
         # self.hide_scores()
 
     def stop_scoring(self):
-        pass
+        self.plugin.color_stream.destroy()
+        self.plugin.label_stream.destroy()
+        self.plugin.color_stream = None
+        self.plugin.label_stream = None
 
     @async_callback
     async def render(self, complex_list, force_enable=False):
@@ -130,13 +134,3 @@ class MainMenu:
             lbl.text_value = ''
             self._ls_results.items.append(clone)
             self.plugin.update_content(self._ls_results)
-
-    def freeze_button(self):
-        self._is_button_loading = True
-        self._btn_score.text.value.set_all("Loading...")
-        self.plugin.update_menu(self._menu)
-
-    def unfreeze_button(self, text):
-        self._is_button_loading = False
-        self._btn_score.text.value.set_all(text)
-        self.plugin.update_menu(self._menu)
