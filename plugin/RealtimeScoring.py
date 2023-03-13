@@ -67,8 +67,9 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             cached_comps = [self.receptor_comp, *self.ligand_comps]
             for cached_comp, updated_comp in zip(cached_comps, updated_comps):
                 position_changed = cached_comp.position.unpack() != updated_comp.position.unpack()
+                rotation_changed = str(cached_comp.rotation) != str(updated_comp.rotation)
                 atoms_changed = sum(1 for _ in cached_comp.atoms) != sum(1 for _ in updated_comp.atoms)
-                if position_changed:
+                if position_changed or rotation_changed:
                     needs_rescore = True
                 if atoms_changed:
                     needs_rescore = True
