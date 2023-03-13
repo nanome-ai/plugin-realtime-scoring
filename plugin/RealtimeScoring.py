@@ -42,38 +42,32 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     @async_callback
     async def update(self):
-        update_time_secs = 5
+        update_time_secs = 3
         has_receptor = getattr(self, 'receptor_comp', None)
         has_ligands = getattr(self, 'ligand_comps', None)
         has_color_stream = getattr(self, 'color_stream', None)
         has_label_stream = getattr(self, 'label_stream', None)
         due_for_update = datetime.now() - self.last_update > timedelta(seconds=update_time_secs)
         if all([
-            has_receptor,
-            has_ligands,
-            has_color_stream,
-            has_label_stream,
-            due_for_update,
-                not self.is_updating]):
+            has_receptor, has_ligands, has_color_stream,
+                has_label_stream, due_for_update, not self.is_updating]):
             Logs.debug("Updating cached ligands.")
             self.is_updating = True
-            ligand_indices = [cmp.index for cmp in self.ligand_comps]
-            updated_ligands = await self.request_complexes(ligand_indices)
-            self.set_atoms_to_workspace_positions(updated_ligands)
+            comp_indices = [self.receptor_comp.index] + [cmp.index for cmp in self.ligand_comps]
+            updated_comps = await self.request_complexes(comp_indices)
+            self.set_atoms_to_workspace_positions(updated_comps)
             self.last_update = datetime.now()
             # Check if positions have changed in workspace
             needs_rescore = False
-            for ligand, updated_ligand in zip(self.ligand_comps, updated_ligands):
-                Logs.debug(f"Cached ligand position: {ligand.position}")
-                Logs.debug(f"Updated ligand position: {updated_ligand.position}")
-                if ligand.position.unpack() != updated_ligand.position.unpack():
+            cached_comps = [self.receptor_comp, *self.ligand_comps]
+            for cached_comp, updated_comp in zip(cached_comps, updated_comps):
+                Logs.debug(f"Cached ligand position: {cached_comp.position}")
+                Logs.debug(f"Updated ligand position: {updated_comp.position}")
+                if cached_comp.position.unpack() != updated_comp.position.unpack():
                     needs_rescore = True
                     break
-                # for atom, updated_atom in zip(ligand.atoms, updated_ligand.atoms):
-                #     if atom.position.unpack() != updated_atom.position.unpack():
-                #         needs_rescore = True
-                #         break
-            self.ligand_comps = updated_ligands
+            self.receptor_comp = updated_comps[0]
+            self.ligand_comps = updated_comps[1:]
             if needs_rescore:
                 Logs.debug("Ligand has moved. Rescoring.")
                 await self.score_ligands()    
