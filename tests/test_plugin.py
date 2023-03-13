@@ -8,7 +8,7 @@ from nanome.api import structure, PluginInstance, shapes
 from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
 from unittest.mock import MagicMock
-from plugin.dsx_parser import dsx_parse
+from plugin.dsx_scoring import dsx_parse
 from random import randint
 
 

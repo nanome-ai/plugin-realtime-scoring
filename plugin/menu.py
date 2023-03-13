@@ -51,7 +51,7 @@ class MainMenu:
             self.unfreeze_button("Start scoring")
             return
 
-        await self.plugin.score_ligands(receptor_index, ligand_indices)
+        await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
         self._menu.title = "Scores"
         # self.hide_scores()
 

@@ -11,7 +11,7 @@ class SettingsMenu():
 
     def __init__(self, plugin):
         self._plugin = plugin
-        self._labels = False
+        self._labels = True
         self._score_all_frames = False
         self.show_total = True
         self.show_pcs = True
@@ -20,6 +20,7 @@ class SettingsMenu():
         # self._menu.register_closed_callback(closed_callback)
 
         self._btn_labels = self._menu.root.find_node('AtomLabelsButton').get_content()
+        self._btn_labels.selected = self._labels
         self._btn_labels.register_pressed_callback(self.toggle_labels)
         self._btn_score_all_frames = self._menu.root.find_node('AllFramesButton').get_content()
         self._btn_score_all_frames.register_pressed_callback(self.toggle_score_all_frames)
