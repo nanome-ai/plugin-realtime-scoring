@@ -123,12 +123,20 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             Logs.error("Ligands not set")
             return
         score_data = await self.calculate_scores(self.receptor_comp, self.ligand_comps)
-        await self.render_atom_scores(score_data)
+
+        # Concatenate all ligand results into a single list
+        all_atom_scores = []
+        for _, ligand_scores in score_data.items():
+            all_atom_scores += ligand_scores['atom_scores']
+        
+        aggregate_scores = [score['aggregate_scores'] for score in score_data.values()]
+        await self.render_atom_scores(all_atom_scores)
+        self.menu.update_ligand_scores(aggregate_scores)
 
     @classmethod
     async def calculate_scores(cls, receptor_comp, ligand_comps):
-        atom_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
-        return atom_scores
+        ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
+        return ligand_scores
 
     async def render_atom_scores(self, score_data):
         # Update the sphere color around each atom
@@ -208,12 +216,14 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
         max_radius = 0.9
         min_radius = 0.4
-        for lig_atom in ligand_atoms:
-            score = scored_indices.get(lig_atom.index, 0)
-            denominator = min_score if score < 0 else max_score
-            norm_score = abs(score / denominator)
+        for atom in ligand_atoms:
+            atom_score = scored_indices.get(atom.index, False)
+            if not atom_score:
+                data.append(0)
+                continue
+            denominator = min_score if atom_score < 0 else max_score
+            norm_score = abs(atom_score / denominator)
             radius = max(norm_score * max_radius, min_radius)
-            Logs.debug("Radius: {}".format(radius))
             data.append(radius)
         return data
 

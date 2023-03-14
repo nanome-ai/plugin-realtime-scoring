@@ -22,6 +22,7 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
     receptor_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
     receptor.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
     # For each ligand, generate a PDB file and run DSX
+    output = {}
     for ligand_comp in ligand_comps:
         ligand_sdf = tempfile.NamedTemporaryFile(suffix='.sdf')
         ligand_comp.io.to_sdf(ligand_sdf.name, SDF_OPTIONS)
@@ -30,10 +31,15 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
         # Convert ligand from sdf to mol2.
         nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
         # Run DSX and retreive data from the subprocess.
-        dsx_output_file = tempfile.NamedTemporaryFile(suffix='.txt')
-        dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_output_file.name)
-        atom_scores = dsx_parse(dsx_output, ligand_comp)
-        return atom_scores
+        dsx_results_file = tempfile.NamedTemporaryFile(suffix='.txt')
+        dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
+        atom_scores = dsx_parse_output(dsx_output, ligand_comp)
+        aggregate_scores = dsx_parse_results(dsx_results_file.name)
+        output[ligand_comp] = {
+            'aggregate_scores': aggregate_scores,
+            'atom_scores': atom_scores
+        }
+    return output
 
 
 def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
@@ -64,7 +70,8 @@ def nanobabel_convert(input_file, output_file):
         return
 
 
-def dsx_parse(dsx_output, ligand_comp):
+def dsx_parse_output(dsx_output, ligand_comp):
+    """Get per atom scores from output of DSX process."""
     ligand_sets = dsx_output.split("# Receptor-Ligand:")[1:]
     scores = dict()
     atom_scores = list()
@@ -101,3 +108,28 @@ def dsx_parse(dsx_output, ligand_comp):
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom_scores.append((atom, score))
     return atom_scores
+
+
+def dsx_parse_results(dsx_output_file):
+    """Parse the output of DSX and return a list of total scores and per contact scores."""
+    data = []
+    with open(dsx_output_file) as results_file:
+        results = results_file.readlines()
+        number_of_lines = len(results)
+        res_line_i = results.index('@RESULTS\n') + 4
+
+        while res_line_i < number_of_lines:
+            if results[res_line_i] == '\n':
+                break
+            result = results[res_line_i].split('|')
+            # name = result[1].strip()
+            score = result[3].strip()
+            pcs = result[5].strip()
+            data.append(
+                {
+                    'total_score': float(score),
+                    'per_contact_score': float(pcs)
+                }
+            )
+            res_line_i += 1
+    return data

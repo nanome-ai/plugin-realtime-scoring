@@ -51,10 +51,17 @@ class MainMenu:
         if len(self._ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
-
+        # Add loading message to results panel
+        results_list = self._p_results.get_content()
+        results_list.items = []
+        clone = self._pfb_result.clone()
+        lbl = clone._get_content()
+        lbl.text_value = 'Loading...'
+        results_list.items.append(clone)
+        self.plugin.update_menu(self._menu)
+        
         await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
         await self.plugin.score_ligands()
-        # self.plugin.update_menu(self._menu)
         self._menu.title = "Scores"
         # self.hide_scores()
 
@@ -135,3 +142,14 @@ class MainMenu:
             lbl.text_value = ''
             self._ls_results.items.append(clone)
             self.plugin.update_content(self._ls_results)
+
+    def update_ligand_scores(self, aggregate_score_list):
+        results_list = self._p_results.get_content()
+        results_list.items = []
+        scores = aggregate_score_list[0][0]
+        for name, score in scores.items():
+            clone = self._pfb_result.clone()
+            lbl = clone._get_content()
+            lbl.text_value = '{}: {}'.format(name, score)
+            results_list.items.append(clone)
+        self.plugin.update_content(results_list)
