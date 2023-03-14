@@ -51,6 +51,7 @@ class MainMenu:
         if len(self._ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
+
         # Add loading message to results panel
         results_list = self._p_results.get_content()
         results_list.items = []

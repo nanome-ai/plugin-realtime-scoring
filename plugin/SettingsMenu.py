@@ -39,6 +39,11 @@ class SettingsMenu():
     def update_labels(self):
         return self._btn_labels.selected
 
+    @update_labels.setter
+    def update_labels(self, value):
+        self._btn_labels.selected = value
+        self._plugin.update_content(self._btn_labels)
+
     @property
     def score_all_frames(self):
         return self._btn_score_all_frames.selected

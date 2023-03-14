@@ -28,6 +28,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.menu = MainMenu(self)
         self.settings = SettingsMenu(self)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.last_update = datetime.now()
@@ -248,10 +249,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_stream = None
         self.label_stream = None
         self.size_stream = None
-
-    @async_callback
-    async def start(self):
-        self.menu = MainMenu(self)
 
     @async_callback
     async def on_run(self):
