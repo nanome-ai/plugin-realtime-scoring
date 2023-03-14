@@ -134,11 +134,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         # Update the sphere color around each atom
         radius_data = self.get_radius_stream_data(score_data, self.ligand_atoms)
         self.size_stream.update(radius_data)
+        Logs.message("Updated radius stream")
         color_stream_data = self.get_color_stream_data(score_data, self.ligand_atoms)
         self.color_stream.update(color_stream_data)
         # If update labels is turned on, update the label stream
         Logs.message("Updated color stream")
-        if self.settings._labels:
+        if self.settings.update_labels:
             label_stream_data = self.get_label_stream_data(score_data, self.ligand_atoms)
             self.label_stream.update(label_stream_data)
             Logs.message("Updated label stream")
