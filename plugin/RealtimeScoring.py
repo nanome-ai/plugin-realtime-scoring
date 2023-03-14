@@ -43,6 +43,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         sphere_indices = [sphere.index for sphere in self.spheres]
         self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
         self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
+        self.size_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
 
     @async_callback
     async def update(self):
@@ -131,6 +132,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     async def render_atom_scores(self, score_data):
         # Update the sphere color around each atom
+        radius_data = self.get_radius_stream_data(score_data, self.ligand_atoms)
+        self.size_stream.update(radius_data)
         color_stream_data = self.get_color_stream_data(score_data, self.ligand_atoms)
         self.color_stream.update(color_stream_data)
         # If update labels is turned on, update the label stream
@@ -139,7 +142,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             label_stream_data = self.get_label_stream_data(score_data, self.ligand_atoms)
             self.label_stream.update(label_stream_data)
             Logs.message("Updated label stream")
-    
+
     @staticmethod
     def get_color_stream_data(score_data, ligand_atoms):
         """Generate color stream data based on atom scores.
@@ -168,30 +171,49 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             alpha = 0
 
             # Alpha used to indicate strong and weak scores
-            max_alpha = 230
+            max_alpha = 200
             atom_score = scored_indices.get(atom.index, False)
             if atom_score:
                 denominator = -min_score if atom_score < 0 else max_score
                 norm_score = atom_score / denominator
                 red = 255 if norm_score > 0 else 0
                 blue = 255 if norm_score < 0 else 0
-                alpha = int(abs(norm_score * max_alpha))
+                alpha = max_alpha  # int(abs(norm_score * max_alpha))
             data.extend((red, green, blue, alpha))
         return data
 
     @staticmethod
     def get_label_stream_data(score_data, ligand_atoms):
-        """Generate color stream data based on atom scores.
-        
-        This assumes score values have been added to each atom,
-        and atom_score_limits on the molecule
-        """
+        """Generate color stream data based on atom scores."""
         scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
         data = []
         for atom in ligand_atoms:
             atom_score = scored_indices.get(atom.index, False)
             label_text = str(round(atom_score, 2)) if atom_score else 'N/A'
             data.append(label_text)            
+        return data
+
+    @staticmethod
+    def get_radius_stream_data(score_data, ligand_atoms):
+        """Generate data to send to sphere radius stream."""
+        data = []
+        scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
+        try:
+            min_score = min(scored_indices.values())
+            max_score = max(scored_indices.values())
+        except ValueError:
+            # No scored atoms, still update colors
+            pass
+
+        max_radius = 0.9
+        min_radius = 0.4
+        for lig_atom in ligand_atoms:
+            score = scored_indices.get(lig_atom.index, 0)
+            denominator = min_score if score < 0 else max_score
+            norm_score = abs(score / denominator)
+            radius = max(norm_score * max_radius, min_radius)
+            Logs.debug("Radius: {}".format(radius))
+            data.append(radius)
         return data
 
     @staticmethod
@@ -211,8 +233,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     def stop_streams(self):
         self.color_stream.destroy()
         self.label_stream.destroy()
+        self.size_stream.destroy()
         self.color_stream = None
         self.label_stream = None
+        self.size_stream = None
 
     @async_callback
     async def start(self):
