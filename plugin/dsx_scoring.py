@@ -33,8 +33,8 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
         # Run DSX and retreive data from the subprocess.
         dsx_results_file = tempfile.NamedTemporaryFile(suffix='.txt')
         dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
-        atom_scores = dsx_parse_output(dsx_output, ligand_comp)
-        aggregate_scores = dsx_parse_results(dsx_results_file.name)
+        atom_scores = parse_output(dsx_output, ligand_comp)
+        aggregate_scores = parse_results(dsx_results_file.name)
         output[ligand_comp] = {
             'aggregate_scores': aggregate_scores,
             'atom_scores': atom_scores
@@ -70,7 +70,7 @@ def nanobabel_convert(input_file, output_file):
         return
 
 
-def dsx_parse_output(dsx_output, ligand_comp):
+def parse_output(dsx_output, ligand_comp):
     """Get per atom scores from output of DSX process."""
     ligand_sets = dsx_output.split("# Receptor-Ligand:")[1:]
     scores = dict()
@@ -110,7 +110,7 @@ def dsx_parse_output(dsx_output, ligand_comp):
     return atom_scores
 
 
-def dsx_parse_results(dsx_output_file):
+def parse_results(dsx_output_file):
     """Parse the output of DSX and return a list of total scores and per contact scores."""
     data = []
     with open(dsx_output_file) as results_file:

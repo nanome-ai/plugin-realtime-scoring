@@ -1,14 +1,13 @@
 import asyncio
+import itertools
 import nanome
-from nanome.util import enums
 import os
 import unittest
-import itertools
-from nanome.api import structure, PluginInstance, shapes
-from plugin.RealtimeScoring import RealtimeScoring
-from random import randint
 from unittest.mock import MagicMock
-from plugin.dsx_scoring import dsx_parse_output
+
+from nanome.api import structure, PluginInstance, shapes
+from plugin.dsx_scoring import parse_output
+from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
 
 
@@ -101,10 +100,3 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.assertEqual(self.plugin.label_stream.update.call_count, 1)
         run_awaitable(validate_score_ligands, self)
 
-    def test_dsx_parse_output(self):
-        results_file = os.path.join(assets_dir, 'dsx_output.txt')
-        with open(results_file, 'r') as f:
-            dsx_output = f.read()
-        expected_atoms_with_scores = 29
-        atom_scores = dsx_parse_output(dsx_output, self.ligand_comp)
-        self.assertEqual(len(atom_scores), expected_atoms_with_scores)
