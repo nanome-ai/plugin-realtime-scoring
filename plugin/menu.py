@@ -54,6 +54,7 @@ class MainMenu:
 
         await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
         await self.plugin.score_ligands()
+        # self.plugin.update_menu(self._menu)
         self._menu.title = "Scores"
         # self.hide_scores()
 
