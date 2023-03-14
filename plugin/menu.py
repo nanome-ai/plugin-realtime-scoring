@@ -67,10 +67,10 @@ class MainMenu:
         # self.hide_scores()
 
     def stop_scoring(self):
-        self.plugin.color_stream.destroy()
-        self.plugin.label_stream.destroy()
-        self.plugin.color_stream = None
-        self.plugin.label_stream = None
+        self.plugin.stop_streams()
+        self._p_selection.enabled = True
+        self._p_results.enabled = False
+        self.plugin.update_menu(self._menu)
 
     @async_callback
     async def render(self, complex_list, force_enable=False):

@@ -28,7 +28,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.menu = MainMenu(self)
+        self.main_menu = MainMenu(self)
         self.settings = SettingsMenu(self)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.last_update = datetime.now()
@@ -132,7 +132,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         
         aggregate_scores = [score['aggregate_scores'] for score in score_data.values()]
         await self.render_atom_scores(all_atom_scores)
-        self.menu.update_ligand_scores(aggregate_scores)
+        self.main_menu.update_ligand_scores(aggregate_scores)
 
     @classmethod
     async def calculate_scores(cls, receptor_comp, ligand_comps):
@@ -253,7 +253,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     @async_callback
     async def on_run(self):
         complex_list = await self.request_complex_list()
-        self.menu.render(complex_list)
+        self.main_menu.render(complex_list)
 
     def on_advanced_settings(self):
         self.settings.open_menu()
@@ -262,9 +262,9 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.temp_dir.cleanup()
 
     def open_menu(self, menu=None):
-        self.menu = self._menu
-        self.menu.enabled = True
-        self.update_menu(self.menu)
+        self.main_menu = self._menu
+        self.main_menu.enabled = True
+        self.update_menu(self.main_menu)
 
     def on_complex_added(self):
         self.request_complex_list(self.update_lists)
