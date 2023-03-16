@@ -26,7 +26,6 @@ class MainMenu:
         self._pfb_complex = nanome.ui.LayoutNode()
         pfb_btn = self._pfb_complex.add_new_button()
         pfb_btn.toggle_on_press = True
-
         self._pfb_result = nanome.ui.LayoutNode()
         self._pfb_result.add_new_label()
 
