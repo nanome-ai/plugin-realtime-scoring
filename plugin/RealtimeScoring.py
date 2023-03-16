@@ -34,17 +34,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.last_update = datetime.now()
         self.is_updating = False
 
-    async def start_ligand_streams(self, ligand_atoms):
-        """Set up streams and Shapes used for rendering scoring results."""
-        if hasattr(self, 'spheres') and getattr(self, 'spheres', None):
-            await Shape.destroy_multiple(self.spheres)
-        self.spheres = self.generate_spheres(self.ligand_atoms)
-        await Shape.upload_multiple(self.spheres)
-        atom_indices = [atom.index for atom in ligand_atoms]
-        sphere_indices = [sphere.index for sphere in self.spheres]
-        self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
-        self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
-        self.size_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
+    @async_callback
+    async def on_run(self):
+        complex_list = await self.request_complex_list()
+        self.main_menu.render(complex_list)
 
     @async_callback
     async def update(self):
@@ -87,13 +80,25 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 await self.score_ligands()    
             self.is_updating = False
 
+    async def start_ligand_streams(self, ligand_atoms):
+        """Set up streams and Shapes used for rendering scoring results."""
+        if hasattr(self, 'spheres') and getattr(self, 'spheres', None):
+            await Shape.destroy_multiple(self.spheres)
+        self.spheres = self.generate_spheres(self.ligand_atoms)
+        await Shape.upload_multiple(self.spheres)
+        atom_indices = [atom.index for atom in ligand_atoms]
+        sphere_indices = [sphere.index for sphere in self.spheres]
+        self.label_stream, _ = await self.create_writing_stream(atom_indices, enums.StreamType.label)
+        self.color_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.shape_color)
+        self.size_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
+
     @staticmethod
     def get_atoms(comp_list):
         """Yield all atoms from a list of complexes."""
         for comp in comp_list:
             for atom in comp.atoms:
                 yield atom
-    
+
     @property
     def ligand_atoms(self):
         """Yield all atoms from all ligands."""
@@ -249,11 +254,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_stream = None
         self.label_stream = None
         self.size_stream = None
-
-    @async_callback
-    async def on_run(self):
-        complex_list = await self.request_complex_list()
-        self.main_menu.render(complex_list)
 
     def on_advanced_settings(self):
         self.settings.open_menu()
