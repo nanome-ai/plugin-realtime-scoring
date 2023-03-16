@@ -97,13 +97,9 @@ def parse_output(dsx_output, ligand_comp):
             mol for i, mol in enumerate(ligand_comp.molecules)
             if i == ligand_comp.current_frame
         )
-        if not hasattr(ligand_molecule, "atom_score_limits"):
-            ligand_molecule.atom_score_limits = [float('inf'), float('-inf')]
 
         for atom_tuple, score_arr in scores.items():
             score = sum(score_arr) / len(score_arr)
-            ligand_molecule.atom_score_limits[0] = min(ligand_molecule.atom_score_limits[0], score)
-            ligand_molecule.atom_score_limits[1] = max(ligand_molecule.atom_score_limits[1], score)
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
             atom_scores.append((atom, score))
     return atom_scores
