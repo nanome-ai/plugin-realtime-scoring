@@ -22,7 +22,7 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
     receptor_pdb = tempfile.NamedTemporaryFile(suffix='.pdb')
     receptor.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
     # For each ligand, generate a PDB file and run DSX
-    output = {}
+    output = []
     for ligand_comp in ligand_comps:
         ligand_sdf = tempfile.NamedTemporaryFile(suffix='.sdf')
         ligand_comp.io.to_sdf(ligand_sdf.name, SDF_OPTIONS)
@@ -35,10 +35,12 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
         dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
         atom_scores = parse_output(dsx_output, ligand_comp)
         aggregate_scores = parse_results(dsx_results_file.name)
-        output[ligand_comp] = {
+        ligand_data = {
+            'complex_index': ligand_comp.index,
             'aggregate_scores': aggregate_scores,
             'atom_scores': atom_scores
         }
+        output.append(ligand_data)
     return output
 
 
@@ -101,7 +103,7 @@ def parse_output(dsx_output, ligand_comp):
         for atom_tuple, score_arr in scores.items():
             score = sum(score_arr) / len(score_arr)
             atom = next(itertools.islice(ligand_molecule.atoms, atom_tuple[1] - 1, atom_tuple[1]))
-            atom_scores.append((atom, score))
+            atom_scores.append((atom.index, score))
     return atom_scores
 
 

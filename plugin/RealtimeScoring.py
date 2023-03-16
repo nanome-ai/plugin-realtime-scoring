@@ -7,6 +7,7 @@ from nanome.api.shapes import Shape, Sphere
 from nanome.util import async_callback, Logs, Color, enums
 
 from dsx import scoring_algo
+from scoring_schema import ScoringOutputSchema
 from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
 
@@ -130,16 +131,20 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
         # Concatenate all ligand results into a single list
         all_atom_scores = []
-        for _, ligand_scores in score_data.items():
+        for ligand_scores in score_data:
             all_atom_scores += ligand_scores['atom_scores']
         
-        aggregate_scores = [score['aggregate_scores'] for score in score_data.values()]
+        aggregate_scores = [score['aggregate_scores'] for score in score_data]
         await self.render_atom_scores(all_atom_scores)
         self.main_menu.update_ligand_scores(aggregate_scores)
 
     @classmethod
     async def calculate_scores(cls, receptor_comp, ligand_comps):
         ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
+        validation_errors = ScoringOutputSchema(many=True).validate(ligand_scores)
+        if validation_errors:
+            # Logs.error("Validation errors: ", validation_errors)
+            raise ValueError("Validation errors: ", validation_errors)
         return ligand_scores
 
     async def render_atom_scores(self, score_data):
@@ -159,20 +164,16 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     @staticmethod
     def get_color_stream_data(score_data, ligand_atoms):
         """Generate color stream data based on atom scores.
-        
-        This assumes score values have been added to each atom,
-        and atom_score_limits on the molecule
-        score_data: list of tuples of (atom, atom_score)
 
         Note: Technically the stream is tied to a Sphere, but
         there is a sphere corresponding to every ligand atom, 
         so using the atom index works just as well.
         """
         data = []
-        scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
+        score_dict = {atom_index: atom_score for atom_index, atom_score in score_data}
         try:
-            min_score = min(scored_indices.values())
-            max_score = max(scored_indices.values())
+            min_score = min(score_dict.values())
+            max_score = max(score_dict.values())
         except ValueError:
             # No scored atoms, still update colors
             pass
@@ -185,7 +186,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
             # Alpha used to indicate strong and weak scores
             max_alpha = 200
-            atom_score = scored_indices.get(atom.index, False)
+            atom_score = score_dict.get(atom.index, False)
             if atom_score:
                 denominator = -min_score if atom_score < 0 else max_score
                 norm_score = atom_score / denominator
@@ -198,10 +199,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     @staticmethod
     def get_label_stream_data(score_data, ligand_atoms):
         """Generate color stream data based on atom scores."""
-        scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
+        score_dict = {
+            atom_index: atom_score
+            for atom_index, atom_score in score_data
+        }
         data = []
         for atom in ligand_atoms:
-            atom_score = scored_indices.get(atom.index, False)
+            atom_score = score_dict.get(atom.index, False)
             label_text = str(round(atom_score, 2)) if atom_score else ''
             data.append(label_text)
         return data
@@ -210,10 +214,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     def get_radius_stream_data(score_data, ligand_atoms):
         """Generate data to send to sphere radius stream."""
         data = []
-        scored_indices = {atom.index: atom_score for atom, atom_score in score_data}
+        score_dict = {
+            atom_index: atom_score
+            for atom_index, atom_score in score_data
+        }
         try:
-            min_score = min(scored_indices.values())
-            max_score = max(scored_indices.values())
+            min_score = min(score_dict.values())
+            max_score = max(score_dict.values())
         except ValueError:
             # No scored atoms, still update colors
             pass
@@ -221,7 +228,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         max_radius = 0.9
         min_radius = 0.4
         for atom in ligand_atoms:
-            atom_score = scored_indices.get(atom.index, False)
+            atom_score = score_dict.get(atom.index, False)
             if not atom_score:
                 data.append(0)
                 continue
