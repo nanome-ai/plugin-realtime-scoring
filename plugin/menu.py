@@ -33,8 +33,8 @@ class MainMenu:
 
     @async_callback
     async def start_scoring_button_pressed(self, button):
-        receptor_index = self._receptor_index
-        ligand_indices = self._ligand_indices
+        receptor_index = self.receptor_index
+        ligand_indices = self.ligand_indices
         if button.selected:
             await self.start_scoring(receptor_index, ligand_indices)
         else:
@@ -49,7 +49,7 @@ class MainMenu:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
             return
 
-        if len(self._ligand_indices) == 0:
+        if len(ligand_indices) == 0:
             self.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
 
@@ -73,49 +73,53 @@ class MainMenu:
 
     @async_callback
     async def render(self, complex_list, force_enable=False):
-        self._shallow_complexes = complex_list
         self.populate_list(self._ls_receptors, complex_list, self.on_receptor_pressed)
-        self.populate_list(self._ls_ligands, complex_list, self.on_ligand_pressed)
+        self.populate_list(self._ls_ligands, complex_list)
+        self.complex_list = complex_list
         if force_enable:
             self._menu.enabled = True
         self.plugin.update_menu(self._menu)
 
-    def update_selected_ligands(self):
-        self._ligand_indices = []
+    @property
+    def receptor_index(self):
+        for item in self._ls_receptors.items:
+            if item.get_content().selected:
+                return item.get_content().index
+
+    @property
+    def ligand_indices(self):
+        indices = []
         for item in self._ls_ligands.items:
             btn = item.get_content()
             if btn.selected:
-                self._ligand_indices.append(btn.index)
+                indices.append(btn.index)
+        return indices
 
-    def receptor_pressed(self, receptor):
+    def on_receptor_pressed(self, btn):
         for item in self._ls_receptors.items:
-            item.get_content().selected = False
-
-        receptor.selected = True
-        self._receptor_index = receptor.index
+            item.get_content().selected == False
+        btn.selected = True
 
         for item in self._ls_ligands.items:
-            ligand = item.get_content()
-            ligand.unusable = receptor.index == ligand.index
-            if ligand.selected and ligand.unusable:
-                ligand.selected = False
-        self.update_selected_ligands()
-
+            ligand_btn = item.get_content()
+            ligand_btn.unusable = btn.index == ligand_btn.index
+            if ligand_btn.selected and ligand_btn.unusable:
+                ligand_btn.selected = False
         self.plugin.update_menu(self._menu)
 
-    def ligand_pressed(self, ligand):
-        ligand.selected = not ligand.selected
-        self.plugin.update_content(ligand)
-        self.update_selected_ligands()
+    # def on_ligand_pressed(self, ligand):
+    #     ligand.selected = not ligand.selected
+    #     self.plugin.update_content(ligand)
 
-    def populate_list(self, ui_list, complex_list, callback):
+    def populate_list(self, ui_list, complex_list, callback=None):
         ui_list.items = []
         for complex in complex_list:
             clone = self._pfb_complex.clone()
             btn = clone.get_content()
             btn.text.value.set_all(complex.full_name)
             btn.index = complex.index
-            btn.register_pressed_callback(callback)
+            if callback:
+                btn.register_pressed_callback(callback)
             ui_list.items.append(clone)
         self.plugin.update_content(ui_list)
 
