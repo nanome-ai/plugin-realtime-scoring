@@ -107,10 +107,6 @@ class MainMenu:
                 ligand_btn.selected = False
         self.plugin.update_menu(self._menu)
 
-    # def on_ligand_pressed(self, ligand):
-    #     ligand.selected = not ligand.selected
-    #     self.plugin.update_content(ligand)
-
     def populate_list(self, ui_list, complex_list, callback=None):
         ui_list.items = []
         for complex in complex_list:
