@@ -204,8 +204,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         data = []
         for atom in ligand_atoms:
             atom_score = scored_indices.get(atom.index, False)
-            label_text = str(round(atom_score, 2)) if atom_score else 'N/A'
-            data.append(label_text)            
+            label_text = str(round(atom_score, 2)) if atom_score else ''
+            data.append(label_text)
         return data
 
     @staticmethod
