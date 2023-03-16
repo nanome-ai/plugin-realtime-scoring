@@ -24,6 +24,9 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 class RealtimeScoring(nanome.AsyncPluginInstance):
 
     scoring_algorithm = scoring_algo.score_ligands
+    color_positive_score = Color(255, 0, 0, 200)
+    color_negative_score = Color(0, 0, 255, 200)
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -161,8 +164,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             self.label_stream.update(label_stream_data)
             Logs.message("Updated label stream")
 
-    @staticmethod
-    def get_color_stream_data(score_data, ligand_atoms):
+    def get_color_stream_data(self, score_data, ligand_atoms):
         """Generate color stream data based on atom scores.
 
         Note: Technically the stream is tied to a Sphere, but
@@ -178,22 +180,18 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             # No scored atoms, still update colors
             pass
 
+        alpha = 200
         for atom in ligand_atoms:
-            red = 0
-            green = 0
-            blue = 0
-            alpha = 0
-
-            # Alpha used to indicate strong and weak scores
-            max_alpha = 200
             atom_score = score_dict.get(atom.index, False)
+            atom_color = Color(0, 0, 0, alpha)
             if atom_score:
                 denominator = -min_score if atom_score < 0 else max_score
                 norm_score = atom_score / denominator
-                red = 255 if norm_score > 0 else 0
-                blue = 255 if norm_score < 0 else 0
-                alpha = max_alpha  # int(abs(norm_score * max_alpha))
-            data.extend((red, green, blue, alpha))
+                if norm_score > 0:
+                    atom_color = self.color_positive_score
+                elif norm_score < 0:
+                    atom_color = self.color_negative_score
+            data.extend(atom_color.rgba)
         return data
 
     @staticmethod
