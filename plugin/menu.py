@@ -29,14 +29,6 @@ class MainMenu:
 
         self._pfb_result = nanome.ui.LayoutNode()
         self._pfb_result.add_new_label()
-        if not self.plugin.realtime_enabled:
-            # Change behavior of button if realtime is disabled
-            self.btn_score.toggle_on_press = False
-            self.btn_score.text.value.set_all("Start Scoring")
-            self.btn_score.text.value.unusable = "Scoring..."
-            self.btn_score.toggle_on_press = False
-            self.btn_score.disable_on_press = True
-            self.plugin.update_content(self.btn_score)
 
     @async_callback
     async def on_scoring_button_pressed(self, button):
@@ -85,6 +77,14 @@ class MainMenu:
 
     @async_callback
     async def render(self, complex_list, force_enable=False):
+        if not self.plugin.realtime_enabled:
+            # Change behavior of button if realtime is disabled
+            self.btn_score.toggle_on_press = False
+            self.btn_score.text.value.set_all("Start Scoring")
+            self.btn_score.text.value.unusable = "Scoring..."
+            self.btn_score.toggle_on_press = False
+            self.btn_score.disable_on_press = True
+            self.plugin.update_content(self.btn_score)
         self.populate_list(self._ls_receptors, complex_list, self.on_receptor_pressed)
         self.populate_list(self._ls_ligands, complex_list)
         self.complex_list = complex_list

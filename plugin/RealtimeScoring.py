@@ -35,8 +35,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_positive_score = custom_data.get('color_positive_score', default_positive_color)
         self.color_negative_score = custom_data.get('color_negative_score', default_negative_color)
         self.realtime_enabled = custom_data.get('realtime_enabled', False)
-
-    def start(self):
         self.main_menu = MainMenu(self)
         self.settings = SettingsMenu(self)
         self.last_update = datetime.now()
