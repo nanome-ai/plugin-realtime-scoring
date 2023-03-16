@@ -1,13 +1,10 @@
 import asyncio
 import itertools
-import nanome
 import os
 import unittest
-from unittest.mock import MagicMock
 
-from nanome.api import structure, PluginInstance, shapes
-from plugin import dsx_scoring
-from plugin.RealtimeScoring import RealtimeScoring
+from nanome.api import structure
+from dsx import scoring_algo
 from random import randint
 
 
@@ -43,13 +40,13 @@ class DsxTestCase(unittest.TestCase):
         with open(results_file, 'r') as f:
             dsx_output = f.read()
         expected_atoms_with_scores = 29
-        atom_scores = dsx_scoring.parse_output(dsx_output, self.ligand_comp)
+        atom_scores = scoring_algo.parse_output(dsx_output, self.ligand_comp)
         self.assertEqual(len(atom_scores), expected_atoms_with_scores)
 
     def test_parse_results(self):
         results_file = os.path.join(assets_dir, 'dsx_results.txt')
         expected_total_score = -127.995
         expected_per_contact_score = -0.2
-        aggregate_scores = dsx_scoring.parse_results(results_file)
+        aggregate_scores = scoring_algo.parse_results(results_file)
         self.assertEqual(aggregate_scores[0]['total_score'], expected_total_score)
         self.assertEqual(aggregate_scores[0]['per_contact_score'], expected_per_contact_score)

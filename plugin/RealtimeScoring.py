@@ -2,15 +2,13 @@ import nanome
 import os
 import tempfile
 from datetime import datetime, timedelta
+from nanome.api import structure
 from nanome.api.shapes import Shape, Sphere
-from nanome.util import Logs, Color, enums
+from nanome.util import async_callback, Logs, Color, enums
 
-
+from dsx import scoring_algo
 from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
-from . import dsx_scoring
-from nanome.util import async_callback
-from nanome.api import structure
 
 
 SDF_OPTIONS = structure.Complex.io.SDFSaveOptions()
@@ -24,7 +22,7 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 
 class RealtimeScoring(nanome.AsyncPluginInstance):
 
-    scoring_algorithm = dsx_scoring.score_ligands
+    scoring_algorithm = scoring_algo.score_ligands
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
