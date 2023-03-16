@@ -24,9 +24,6 @@ RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
 class RealtimeScoring(nanome.AsyncPluginInstance):
 
     scoring_algorithm = scoring_algo.score_ligands
-    color_positive_score = Color(255, 0, 0, 200)
-    color_negative_score = Color(0, 0, 255, 200)
-
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,6 +32,15 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.last_update = datetime.now()
         self.is_updating = False
+
+        try:
+            custom_data = self._custom_data[0]
+        except IndexError:
+            custom_data = {}
+        default_negative_color = Color.Blue()
+        default_positive_color = Color.Red()
+        self.color_positive_score = custom_data.get('color_positive_score', default_positive_color)
+        self.color_negative_score = custom_data.get('color_negative_score', default_negative_color)
 
     @async_callback
     async def on_run(self):
@@ -274,14 +280,3 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def on_complex_removed(self):
         self.request_complex_list(self.update_lists)
-
-
-def main():
-    description = "Display realtime scoring info about a selected ligand."
-    plugin = nanome.Plugin("Realtime Scoring", description, "Scoring", True)
-    plugin.set_plugin_class(RealtimeScoring)
-    plugin.run()
-
-
-if __name__ == "__main__":
-    main()
