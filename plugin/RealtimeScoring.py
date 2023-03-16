@@ -1,6 +1,5 @@
 import nanome
 import os
-import tempfile
 from datetime import datetime, timedelta
 from nanome.api import structure
 from nanome.api.shapes import Shape, Sphere
@@ -27,20 +26,21 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.main_menu = MainMenu(self)
-        self.settings = SettingsMenu(self)
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.last_update = datetime.now()
-        self.is_updating = False
-
         try:
             custom_data = self._custom_data[0]
-        except IndexError:
+        except (IndexError, AttributeError):
             custom_data = {}
-        default_negative_color = Color.Blue()
-        default_positive_color = Color.Red()
+        default_negative_color = Color(0, 0, 255, 200)
+        default_positive_color = Color(255, 0, 0, 200)
         self.color_positive_score = custom_data.get('color_positive_score', default_positive_color)
         self.color_negative_score = custom_data.get('color_negative_score', default_negative_color)
+        self.realtime_enabled = custom_data.get('realtime_enabled', False)
+
+    def start(self):
+        self.main_menu = MainMenu(self)
+        self.settings = SettingsMenu(self)
+        self.last_update = datetime.now()
+        self.is_updating = False
 
     @async_callback
     async def on_run(self):
@@ -49,6 +49,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     @async_callback
     async def update(self):
+        if not self.realtime_enabled:
+            return
         update_time_secs = 3
         has_receptor = getattr(self, 'receptor_comp', None)
         has_ligands = getattr(self, 'ligand_comps', None)
@@ -266,9 +268,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def on_advanced_settings(self):
         self.settings.open_menu()
-
-    def on_stop(self):
-        self.temp_dir.cleanup()
 
     def open_menu(self, menu=None):
         self.main_menu = self._menu

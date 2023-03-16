@@ -14,5 +14,6 @@ if __name__ == "__main__":
     custom_data = {
         'color_positive_score': Color.White(),
         'color_negative_score': Color.Yellow(),
+        'realtime_enabled': False
     }
     main(custom_data)

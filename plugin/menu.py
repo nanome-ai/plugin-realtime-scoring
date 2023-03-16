@@ -21,29 +21,39 @@ class MainMenu:
         self._ls_ligands: ui.UIList = self._menu.root.find_node("Ligands List", True).get_content()
         self._ls_results: ui.UIList = self.ln_results.get_content()
         self.btn_score: ui.Button = self._menu.root.find_node("btn_score", True).get_content()
-        self.btn_score.register_pressed_callback(self.start_scoring_button_pressed)
+        self.btn_score.register_pressed_callback(self.on_scoring_button_pressed)
         self.btn_score.toggle_on_press = True
-
         self._pfb_complex = nanome.ui.LayoutNode()
         pfb_btn = self._pfb_complex.add_new_button()
         pfb_btn.toggle_on_press = True
 
         self._pfb_result = nanome.ui.LayoutNode()
         self._pfb_result.add_new_label()
+        if not self.plugin.realtime_enabled:
+            # Change behavior of button if realtime is disabled
+            self.btn_score.toggle_on_press = False
+            self.btn_score.text.value.set_all("Start Scoring")
+            self.btn_score.text.value.unusable = "Scoring..."
+            self.btn_score.toggle_on_press = False
+            self.btn_score.disable_on_press = True
+            self.plugin.update_content(self.btn_score)
 
     @async_callback
-    async def start_scoring_button_pressed(self, button):
+    async def on_scoring_button_pressed(self, button):
         receptor_index = self.receptor_index
         ligand_indices = self.ligand_indices
-        if button.selected:
+        if button.selected or not self.plugin.realtime_enabled:
             await self.start_scoring(receptor_index, ligand_indices)
         else:
             self.stop_scoring()
+        self.plugin.update_content(button)
 
     async def start_scoring(self, receptor_index, ligand_indices):
         Logs.message("Start Scoring")
-        self.ln_selection.enabled = False
-        self.ln_results.enabled = True
+        if self.plugin.realtime_enabled:
+            # Don't switch panels if realtime is enabled
+            self.ln_selection.enabled = False
+            self.ln_results.enabled = True
 
         if receptor_index is None:
             self.send_notification(NotificationTypes.error, "Please select a receptor")
@@ -60,10 +70,12 @@ class MainMenu:
         lbl = clone._get_content()
         lbl.text_value = 'Loading...'
         results_list.items.append(clone)
-        self.plugin.update_menu(self._menu)
+        if self.plugin.realtime_enabled:
+            self.plugin.update_menu(self._menu)
         await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
         await self.plugin.score_ligands()
-        self._menu.title = "Scores"
+        if self.plugin.realtime_enabled:
+            self._menu.title = "Scores"
 
     def stop_scoring(self):
         self.plugin.stop_streams()
