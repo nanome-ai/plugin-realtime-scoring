@@ -26,19 +26,29 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        try:
-            custom_data = self._custom_data[0]
-        except (IndexError, AttributeError):
-            custom_data = {}
-        default_negative_color = Color(0, 0, 255, 200)
-        default_positive_color = Color(255, 0, 0, 200)
-        self.color_positive_score = custom_data.get('color_positive_score', default_positive_color)
-        self.color_negative_score = custom_data.get('color_negative_score', default_negative_color)
-        self.realtime_enabled = custom_data.get('realtime_enabled', False)
         self.main_menu = MainMenu(self)
         self.settings = SettingsMenu(self)
         self.last_update = datetime.now()
         self.is_updating = False
+        # Configurable settings
+        self.color_negative_score = Color(0, 0, 255, 200)  # Blue
+        self.color_positive_score = Color(255, 0, 0, 200)  # Red
+        self.realtime_enabled = True
+
+
+    def start(self):
+        # Update settings based on custom data added at runtime.
+        try:
+            custom_data = self._custom_data[0]
+        except (IndexError, AttributeError):
+            custom_data = {}
+
+        if custom_data.get('color_negative_score'):
+            self.color_negative_score = custom_data.get('color_negative_score')
+        if custom_data.get('color_positive_score'):
+            self.color_positive_score = custom_data.get('color_positive_score')
+        if custom_data.get('realtime_enabled'):
+            self.realtime_enabled = custom_data.get('realtime_enabled')
 
     @async_callback
     async def on_run(self):

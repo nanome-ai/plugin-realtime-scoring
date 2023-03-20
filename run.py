@@ -2,13 +2,6 @@ import nanome
 from plugin.RealtimeScoring import RealtimeScoring
 from nanome.util import Color
 
-def main(custom_data):
-    description = "Display realtime scoring info about a selected ligand."
-    plugin = nanome.Plugin("Realtime Scoring", description, "Scoring", True)
-    plugin.set_plugin_class(RealtimeScoring)
-    plugin.set_custom_data(custom_data)
-    plugin.run()
-
 
 if __name__ == "__main__":
     custom_data = {
@@ -16,4 +9,12 @@ if __name__ == "__main__":
         'color_negative_score': Color.Yellow(),
         'realtime_enabled': False
     }
-    main(custom_data)
+    custom_data = {}
+    plugin_name = 'Realtime Scoring'
+    description = "Display realtime scoring info about a selected ligand."
+    tag = 'Scoring'
+    has_advanced_settings = True
+    plugin = nanome.Plugin(plugin_name, description, tag, has_advanced_settings)
+    plugin.set_plugin_class(RealtimeScoring)
+    plugin.set_custom_data(custom_data)
+    plugin.run()

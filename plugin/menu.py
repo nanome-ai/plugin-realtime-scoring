@@ -47,11 +47,11 @@ class MainMenu:
             self.ln_results.enabled = True
 
         if receptor_index is None:
-            self.send_notification(NotificationTypes.error, "Please select a receptor")
+            self.plugin.send_notification(NotificationTypes.error, "Please select a receptor")
             return
 
         if len(ligand_indices) == 0:
-            self.send_notification(NotificationTypes.error, "Please select at least one ligand")
+            self.plugin.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
 
         # Add loading message to results panel
