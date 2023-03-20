@@ -5,11 +5,10 @@ from nanome.util import Color
 
 if __name__ == "__main__":
     custom_data = {
-        'color_positive_score': Color.White(),
-        'color_negative_score': Color.Yellow(),
-        'realtime_enabled': False
+        'color_positive_score': Color(255, 0, 0, 200),
+        'color_negative_score': Color(0, 0, 255, 200),
+        'realtime_enabled': True
     }
-    custom_data = {}
     plugin_name = 'Realtime Scoring'
     description = "Display realtime scoring info about a selected ligand."
     tag = 'Scoring'
