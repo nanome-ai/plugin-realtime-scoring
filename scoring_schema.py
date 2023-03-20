@@ -12,7 +12,7 @@ class ScoringOutputSchema(Schema):
     aggregate_scores = fields.List(
         fields.Dict(keys=fields.Str(), values=fields.Float()),
         required=False)
-    
+
     # List of tuples, where the first element is the atom index and the second
     # element is the atom's score.
     atom_scores = fields.List(

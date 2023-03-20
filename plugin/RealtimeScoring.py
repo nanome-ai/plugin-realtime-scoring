@@ -35,7 +35,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_positive_score = Color(255, 0, 0, 200)  # Red
         self.realtime_enabled = True
 
-
     def start(self):
         # Update settings based on custom data added at runtime.
         try:
@@ -95,7 +94,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 await self.start_ligand_streams(self.ligand_atoms)
             if needs_rescore:
                 Logs.debug("Rescoring Ligands.")
-                await self.score_ligands()    
+                await self.score_ligands()
             self.is_updating = False
 
     async def start_ligand_streams(self, ligand_atoms):
@@ -152,7 +151,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         all_atom_scores = []
         for ligand_scores in score_data:
             all_atom_scores += ligand_scores['atom_scores']
-        
+
         aggregate_scores = [score['aggregate_scores'] for score in score_data]
         await self.render_atom_scores(all_atom_scores)
         self.main_menu.update_ligand_scores(aggregate_scores)

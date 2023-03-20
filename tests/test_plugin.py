@@ -52,7 +52,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
             upload_multiple_fut = asyncio.Future()
             upload_multiple_fut.set_result(None)
             shapes.Shape.upload_multiple = MagicMock(return_value=upload_multiple_fut)
-            
+
             # Mock request complexes call
             request_complexes_fut = asyncio.Future()
             request_complexes_fut.set_result([self.receptor_comp, self.ligand_comp])
@@ -96,4 +96,3 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.assertEqual(self.plugin.size_stream.update.call_count, 2)
             self.assertEqual(self.plugin.label_stream.update.call_count, 1)
         run_awaitable(validate_score_ligands, self)
-

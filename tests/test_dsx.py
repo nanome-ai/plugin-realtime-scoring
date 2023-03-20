@@ -34,7 +34,6 @@ class DsxTestCase(unittest.TestCase):
             for atom in residue.atoms:
                 atom.index = randint(1000000000, 9999999999)
 
-
     def test_parse_output(self):
         results_file = os.path.join(assets_dir, 'dsx_output.txt')
         with open(results_file, 'r') as f:

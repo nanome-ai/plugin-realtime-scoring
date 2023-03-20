@@ -47,12 +47,11 @@ class SettingsMenu():
     @property
     def score_all_frames(self):
         return self._btn_score_all_frames.selected
-    
+
     @property
     def show_total_scores(self):
         return self._btn_total.selected
-    
+
     @property
     def per_contact_scores(self):
         return self._btn_pcs.selected
-    
