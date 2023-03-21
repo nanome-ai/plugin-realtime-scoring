@@ -195,10 +195,9 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             # No scored atoms, still update colors
             pass
 
-        alpha = 200
         for atom in ligand_atoms:
             atom_score = score_dict.get(atom.index, False)
-            atom_color = Color(0, 0, 0, alpha)
+            atom_color = Color(0, 0, 0, 0)
             if atom_score:
                 denominator = -min_score if atom_score < 0 else max_score
                 norm_score = atom_score / denominator
@@ -276,13 +275,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     def on_advanced_settings(self):
         self.settings.open_menu()
 
-    def open_menu(self, menu=None):
-        self.main_menu = self._menu
-        self.main_menu.enabled = True
-        self.update_menu(self.main_menu)
+    @async_callback
+    async def on_complex_added(self):
+        comp_list = await self.request_complex_list()
+        await self.menu.render(comp_list)
 
-    def on_complex_added(self):
-        self.request_complex_list(self.update_lists)
-
-    def on_complex_removed(self):
-        self.request_complex_list(self.update_lists)
+    @async_callback
+    async def on_complex_removed(self):
+        comp_list = await self.request_complex_list()
+        await self.menu.render(comp_list)
