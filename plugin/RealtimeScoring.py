@@ -37,10 +37,12 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def start(self):
         # Update settings based on custom data added at runtime.
-        try:
-            custom_data = self._custom_data[0]
-        except (IndexError, AttributeError):
-            custom_data = {}
+        custom_data = {}
+        if self._custom_data:
+            try:
+                custom_data = self._custom_data[0]
+            except (IndexError, AttributeError):
+                pass
 
         if custom_data.get('color_negative_score'):
             self.color_negative_score = custom_data.get('color_negative_score')
@@ -133,6 +135,22 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     async def setup_receptor_and_ligands(self, receptor_index, ligand_indices):
         deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
+
+        # convert ligands to frames if in conformer mode
+        ligs_to_update = []
+        for lig in deep_comps[1:]:
+            if any([mol.conformer_count > 1 for mol in lig.molecules]):
+                ligs_to_update = lig
+
+        for i in range(0, len(ligs_to_update)):
+            ligand = ligs_to_update[i]
+            frame_lig = ligand.convert_to_frames()
+            frame_lig.index = ligand.index
+
+        if ligs_to_update:
+            await self.update_structures_deep(ligs_to_update)
+
+        # Convert all atoms coordinates to be relative to global workspace.
         self.set_atoms_to_workspace_positions(deep_comps)
         self.receptor_comp = deep_comps[0]
         self.ligand_comps = deep_comps[1:]
