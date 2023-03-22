@@ -10,3 +10,4 @@ plugin/dsx/results.txt
 *dsx*.txt
 .env*
 venv
+custom_scoring
