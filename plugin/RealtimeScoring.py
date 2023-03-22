@@ -1,3 +1,4 @@
+import itertools
 import nanome
 import os
 from datetime import datetime, timedelta
@@ -9,6 +10,7 @@ from dsx import scoring_algo
 from scoring_schema import ScoringOutputSchema
 from .SettingsMenu import SettingsMenu
 from .menu import MainMenu
+from plugin import utils
 
 
 SDF_OPTIONS = structure.Complex.io.SDFSaveOptions()
@@ -62,7 +64,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             return
         update_time_secs = 3
         has_receptor = getattr(self, 'receptor_comp', None)
-        has_ligands = getattr(self, 'ligand_comps', None)
+        has_ligands = getattr(self, 'ligand_residues', None)
         has_color_stream = getattr(self, 'color_stream', None)
         has_label_stream = getattr(self, 'label_stream', None)
         due_for_update = datetime.now() - self.last_update > timedelta(seconds=update_time_secs)
@@ -71,14 +73,20 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 has_label_stream, due_for_update, not self.is_updating]):
             Logs.debug("Updating cached ligands.")
             self.is_updating = True
-            comp_indices = [self.receptor_comp.index] + [cmp.index for cmp in self.ligand_comps]
+
+            # Get updated complexes:
+            lig_comp_indices = set()
+            for res in self.ligand_residues:
+                lig_comp_indices.add(res.complex.index)
+
+            comp_indices = set([self.receptor_comp.index] + list(lig_comp_indices))
             updated_comps = await self.request_complexes(comp_indices)
             self.set_atoms_to_workspace_positions(updated_comps)
             self.last_update = datetime.now()
             # Check if positions have changed in workspace
             needs_rescore = False
             needs_stream_update = False
-            cached_comps = [self.receptor_comp, *self.ligand_comps]
+            cached_comps = [self.receptor_comp]
             for cached_comp, updated_comp in zip(cached_comps, updated_comps):
                 position_changed = cached_comp.position.unpack() != updated_comp.position.unpack()
                 rotation_changed = str(cached_comp.rotation) != str(updated_comp.rotation)
@@ -90,12 +98,15 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     needs_stream_update = True
                     break
             self.receptor_comp = updated_comps[0]
-            self.ligand_comps = updated_comps[1:]
+            # Update ligand residues with updated complexes
+            all_comp_residues = itertools.chain(*[comp.residues for comp in updated_comps])
+            ligand_res_indices = [res.index for res in self.ligand_residues]
+            self.ligand_residues = [res for res in all_comp_residues if res.index in ligand_res_indices]
             if needs_stream_update:
                 Logs.debug("Ligand has changed. Updating streams.")
                 await self.start_ligand_streams(self.ligand_atoms)
             if needs_rescore:
-                Logs.debug("Rescoring Ligands.")
+                Logs.debug("Positions changed. Rescoring Ligands.")
                 await self.score_ligands()
             self.is_updating = False
 
@@ -112,16 +123,16 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.size_stream, _ = await self.create_writing_stream(sphere_indices, enums.StreamType.sphere_shape_radius)
 
     @staticmethod
-    def get_atoms(comp_list):
-        """Yield all atoms from a list of complexes."""
-        for comp in comp_list:
-            for atom in comp.atoms:
+    def get_atoms(struct_list):
+        """Yield all atoms from a list of structures."""
+        for struc in struct_list:
+            for atom in struc.atoms:
                 yield atom
 
     @property
     def ligand_atoms(self):
         """Yield all atoms from all ligands."""
-        return self.get_atoms(self.ligand_comps)
+        return self.get_atoms(self.ligand_residues)
 
     @staticmethod
     def set_atoms_to_workspace_positions(comp_list):
@@ -133,37 +144,39 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                 atom._old_position = atom.position
                 atom.position = mat * atom.position
 
-    async def setup_receptor_and_ligands(self, receptor_index, ligand_indices):
-        deep_comps = await self.request_complexes([receptor_index, *ligand_indices])
-
-        # convert ligands to frames if in conformer mode
-        ligs_to_update = []
-        for lig in deep_comps[1:]:
-            if any([mol.conformer_count > 1 for mol in lig.molecules]):
-                ligs_to_update = lig
-
-        for i in range(0, len(ligs_to_update)):
-            ligand = ligs_to_update[i]
-            frame_lig = ligand.convert_to_frames()
-            frame_lig.index = ligand.index
-
-        if ligs_to_update:
-            await self.update_structures_deep(ligs_to_update)
+    async def setup_receptor_and_ligands(self, receptor_index, ligand_residues):
+        # Let's make sure we have deep receptor and ligand complexes
+        ligand_complexes = []
+        for res in ligand_residues:
+            if res.complex:
+                ligand_complexes.append(res.complex)
+            else:
+                raise Exception('No Complex associated with Residue')
+        comp_indices  = [receptor_index] + [cmp.index for cmp in ligand_complexes if cmp.index != receptor_index]
+        deep_comps = await self.request_complexes(comp_indices)
 
         # Convert all atoms coordinates to be relative to global workspace.
         self.set_atoms_to_workspace_positions(deep_comps)
         self.receptor_comp = deep_comps[0]
-        self.ligand_comps = deep_comps[1:]
+        all_residues = [res for comp in deep_comps for res in comp.residues]
+        selected_res_indices = [res.index for res in ligand_residues]
+        self.ligand_residues = list([
+            res for res in all_residues
+            if res.index in selected_res_indices
+        ])
         await self.start_ligand_streams(self.ligand_atoms)
 
     async def score_ligands(self):
         if not getattr(self, 'receptor_comp', None):
             Logs.error("Receptor not set")
             return
-        if not getattr(self, 'ligand_comps', None):
+        if not getattr(self, 'ligand_residues', None):
             Logs.error("Ligands not set")
             return
-        score_data = await self.calculate_scores(self.receptor_comp, self.ligand_comps)
+        if not getattr(self, 'ligand_residues', None):
+            Logs.warning("Ligand Residues not specified")
+            return
+        score_data = await self.calculate_scores(self.receptor_comp, self.ligand_residues)
 
         # Concatenate all ligand results into a single list
         all_atom_scores = []
@@ -175,7 +188,11 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.main_menu.update_ligand_scores(aggregate_scores)
 
     @classmethod
-    async def calculate_scores(cls, receptor_comp, ligand_comps):
+    async def calculate_scores(cls, receptor_comp, ligand_residues):
+        # write ligand residues to separate complex
+        ligand_comps = list(set([lig.complex for lig in ligand_residues]))
+        for i, lig in enumerate(ligand_comps):
+            ligand_comps[i] = utils.extract_residues_from_complex(lig, ligand_residues)
         ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
         validation_errors = ScoringOutputSchema(many=True).validate(ligand_scores)
         if validation_errors:

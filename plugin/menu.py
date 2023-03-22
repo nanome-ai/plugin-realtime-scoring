@@ -23,6 +23,7 @@ class MainMenu:
         self.btn_score: ui.Button = self._menu.root.find_node("btn_score", True).get_content()
         self.btn_score.register_pressed_callback(self.on_scoring_button_pressed)
         self.btn_score.toggle_on_press = True
+        
         self._pfb_complex = nanome.ui.LayoutNode()
         pfb_btn = self._pfb_complex.add_new_button()
         pfb_btn.toggle_on_press = True
@@ -32,14 +33,14 @@ class MainMenu:
     @async_callback
     async def on_scoring_button_pressed(self, button):
         receptor_index = self.receptor_index
-        ligand_indices = self.ligand_indices
+        ligand_residues = self.ligand_residues
         if button.selected or not self.plugin.realtime_enabled:
-            await self.start_scoring(receptor_index, ligand_indices)
+            await self.start_scoring(receptor_index, ligand_residues)
         else:
             self.stop_scoring()
         self.plugin.update_content(button)
 
-    async def start_scoring(self, receptor_index, ligand_indices):
+    async def start_scoring(self, receptor_index, ligand_residues):
         Logs.message("Start Scoring")
         if self.plugin.realtime_enabled:
             # Don't switch panels if realtime is enabled
@@ -50,7 +51,7 @@ class MainMenu:
             self.plugin.send_notification(NotificationTypes.error, "Please select a receptor")
             return
 
-        if len(ligand_indices) == 0:
+        if len(ligand_residues) == 0:
             self.plugin.send_notification(NotificationTypes.error, "Please select at least one ligand")
             return
 
@@ -63,7 +64,9 @@ class MainMenu:
         results_list.items.append(clone)
         if self.plugin.realtime_enabled:
             self.plugin.update_menu(self._menu)
-        await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_indices)
+
+        await self.plugin.setup_receptor_and_ligands(
+            receptor_index, ligand_residues)
         await self.plugin.score_ligands()
         if self.plugin.realtime_enabled:
             self._menu.title = "Scores"
@@ -98,22 +101,53 @@ class MainMenu:
                 return item.get_content().index
 
     @property
-    def ligand_indices(self):
-        indices = []
+    def ligand_residues(self):
+        residues = []
         for item in self._ls_ligands.items:
             btn = item.get_content()
             if btn.selected:
-                indices.append(btn.index)
-        return indices
+                residues.extend(btn.residue_list)
+        return residues
 
-    def on_receptor_pressed(self, btn):
+    @async_callback
+    async def on_receptor_pressed(self, btn):
         for item in self._ls_receptors.items:
             item.get_content().selected == False
         btn.selected = True
 
+        # Extract ligands from receptor, and add as entry to ligand list
+        receptor = next(cmp for cmp in self.complex_list if cmp.index == btn.index)
+        if sum(1 for _ in receptor.molecules) == 0:
+            # Get deep structure, and extract ligands
+            [deep_receptor] = await self.plugin.request_complexes([receptor.index])
+            mol = next(
+                ml for i, ml in enumerate(deep_receptor.molecules)
+                if i == deep_receptor.current_frame
+            )
+            ligands = await mol.get_ligands()
+            
+            for lig in ligands:
+                clone = self._pfb_complex.clone()
+                btn = clone.get_content()
+                btn.text.value.set_all(lig.name)
+                btn.index = receptor.index
+                btn.residue_list = list(lig.residues)
+
+                # make sure complex is stored on residue, we will need it later
+                for residue in lig.residues:
+                    # Find the chain that this residue belongs to, and set parent
+                    rez_chain = next(
+                        chain for chain in mol.chains
+                        if chain.name == residue.chain.name
+                    )
+                    residue._parent = rez_chain
+                self._ls_ligands.items.append(clone)
+
         for item in self._ls_ligands.items:
             ligand_btn = item.get_content()
-            ligand_btn.unusable = btn.index == ligand_btn.index
+            ligand_btn.unusable = (
+                btn.text.value.selected != ligand_btn.text.value.selected
+            )
             if ligand_btn.selected and ligand_btn.unusable:
                 ligand_btn.selected = False
         self.plugin.update_menu(self._menu)
