@@ -19,7 +19,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.main_menu = MainMenu(self)
+        self.menu = MainMenu(self)
         self.settings = SettingsMenu(self)
         self.last_update = datetime.now()
         self.is_updating = False
@@ -53,7 +53,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         complex_list = await self.request_complex_list()
         comp_indices = set([comp.index for comp in complex_list])
         self.complex_cache = await self.request_complexes(comp_indices)
-        self.main_menu.render()
+        self.menu.render()
 
     @async_callback
     async def update(self):
@@ -188,7 +188,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
         aggregate_scores = [score['aggregate_scores'] for score in score_data]
         await self.render_atom_scores(all_atom_scores)
-        self.main_menu.update_ligand_scores(aggregate_scores)
+        self.menu.update_ligand_scores(aggregate_scores)
 
     @classmethod
     async def calculate_scores(cls, receptor_comp, ligand_residues):
