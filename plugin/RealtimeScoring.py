@@ -93,7 +93,15 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     needs_rescore = True
                     needs_stream_update = True
                     break
-            self.complex_cache = updated_comps
+
+            # Update cached complexes
+            for i in range(len(self.complex_cache) -1, -1, -1):
+                cached_comp = self.complex_cache[i]
+                if cached_comp.index in comp_indices:
+                    updated_version = next(cmp for cmp in updated_comps if cmp.index == cached_comp.index)
+                    if updated_version:
+                        Logs.debug("Updating Cache")
+                        self.complex_cache[i] = updated_version
             # Update ligand residues with updated complexes
             all_comp_residues = itertools.chain(*[comp.residues for comp in self.complex_cache])
             ligand_res_indices = [res.index for res in self.ligand_residues]
