@@ -36,6 +36,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_negative_score = Color(0, 0, 255, 200)  # Blue
         self.color_positive_score = Color(255, 0, 0, 200)  # Red
         self.realtime_enabled = True
+        # api structures
+        self.receptor = None
+        self.ligand_residues = []
+        self.complex_cache = {}
 
     def start(self):
         # Update settings based on custom data added at runtime.
@@ -56,7 +60,9 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     @async_callback
     async def on_run(self):
         complex_list = await self.request_complex_list()
-        self.main_menu.render(complex_list)
+        comp_indices = set([comp.index for comp in complex_list])
+        self.complex_cache = await self.request_complexes(comp_indices)
+        self.main_menu.render()
 
     @async_callback
     async def update(self):
@@ -86,8 +92,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             # Check if positions have changed in workspace
             needs_rescore = False
             needs_stream_update = False
-            cached_comps = [self.receptor_comp]
-            for cached_comp, updated_comp in zip(cached_comps, updated_comps):
+            for cached_comp, updated_comp in zip(self.complex_cache, updated_comps):
                 position_changed = cached_comp.position.unpack() != updated_comp.position.unpack()
                 rotation_changed = str(cached_comp.rotation) != str(updated_comp.rotation)
                 atoms_changed = sum(1 for _ in cached_comp.atoms) != sum(1 for _ in updated_comp.atoms)
@@ -97,9 +102,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     needs_rescore = True
                     needs_stream_update = True
                     break
+            self.complex_cache = updated_comps
             self.receptor_comp = updated_comps[0]
             # Update ligand residues with updated complexes
-            all_comp_residues = itertools.chain(*[comp.residues for comp in updated_comps])
+            all_comp_residues = itertools.chain(*[comp.residues for comp in self.complex_cache])
             ligand_res_indices = [res.index for res in self.ligand_residues]
             self.ligand_residues = [res for res in all_comp_residues if res.index in ligand_res_indices]
             if needs_stream_update:
