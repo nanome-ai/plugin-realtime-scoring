@@ -18,7 +18,6 @@ class MainMenu:
         self.ln_results: ui.LayoutNode = self._menu.root.find_node("Results Panel", True)
         self._ls_receptors: ui.UIList = self._menu.root.find_node("Receptor List", True).get_content()
         self._ls_ligands: ui.UIList = self._menu.root.find_node("Ligands List", True).get_content()
-        self._ls_results: ui.UIList = self.ln_results.get_content()
         self.btn_score: ui.Button = self._menu.root.find_node("btn_score", True).get_content()
         self.btn_score.register_pressed_callback(self.on_scoring_button_pressed)
         self.btn_score.toggle_on_press = True
@@ -91,19 +90,20 @@ class MainMenu:
         complex_list = self.plugin.complex_cache
         self.populate_list(self._ls_receptors, complex_list, self.on_receptor_pressed)
         self.populate_list(self._ls_ligands, complex_list)
-        self.complex_list = complex_list
         if force_enable:
             self._menu.enabled = True
         self.plugin.update_menu(self._menu)
 
     @property
     def receptor_index(self):
+        """Get the complex index from the currently selected button."""
         for item in self._ls_receptors.items:
             if item.get_content().selected:
                 return item.get_content().index
 
     @property
     def ligand_residues(self):
+        """Get the list of residues from the currently selected buttons."""
         residues = []
         for item in self._ls_ligands.items:
             btn = item.get_content()
@@ -112,15 +112,14 @@ class MainMenu:
         return residues
 
     @async_callback
-    async def on_receptor_pressed(self, btn):
+    async def on_receptor_pressed(self, receptor_btn):
+        # Deselect every other receptor button
         for item in self._ls_receptors.items:
             item_btn = item.get_content()
-            item_btn.selected = item_btn._content_id == btn._content_id
+            item_btn.selected = \
+                item_btn._content_id == receptor_btn._content_id
 
-        # Extract ligands from receptor, and add as entry to ligand list
-        receptor = next(cmp for cmp in self.complex_list if cmp.index == btn.index)
-
-        # Remove previous ligand items from list
+        # Remove previously extracted ligand items from list
         # Iterate in reverse order for simpler deletions
         for i in range(len(self._ls_ligands.items) - 1, -1, -1):
             item = self._ls_ligands.items[i]
@@ -128,13 +127,17 @@ class MainMenu:
             if hasattr(item_btn, 'extracted_ligand'):
                 self._ls_ligands.items.remove(item)
 
-        # Get deep structure, and extract ligands
-        [deep_receptor] = await self.plugin.request_complexes([receptor.index])
+        # Extract ligands from receptor, and add as entry to ligand list
+        receptor_index = receptor_btn.index
+        complex_list = self.plugin.complex_cache
+        receptor = next(
+            cmp for cmp in complex_list
+            if cmp.index == receptor_index)
         mol = next(
-            ml for i, ml in enumerate(deep_receptor.molecules)
-            if i == deep_receptor.current_frame
-        )
+            ml for i, ml in enumerate(receptor.molecules)
+            if i == receptor.current_frame)
         ligands = await mol.get_ligands()
+        # Create new button for every ligand.
         for lig in ligands:
             clone = self._pfb_complex.clone()
             btn = clone.get_content()
@@ -142,23 +145,22 @@ class MainMenu:
             btn.index = receptor.index
             btn.residue_list = list(lig.residues)
             btn.extracted_ligand = True
-
-            # make sure complex is stored on residue, we will need it later
+            # make sure structure tree is stored on residue, we will need it later
             for residue in lig.residues:
                 # Find the chain that this residue belongs to, and set parent
-                rez_chain = next(
+                res_chain = next(
                     chain for chain in mol.chains
                     if chain.name == residue.chain.name
                 )
-                residue._parent = rez_chain
+                residue._parent = res_chain
             self._ls_ligands.items.append(clone)
-        # for item in self._ls_ligands.items:
-        #     ligand_btn = item.get_content()
-        #     ligand_btn.unusable = (
-        #         btn.text.value.selected == ligand_btn.text.value.selected
-        #     )
-        #     if ligand_btn.selected and ligand_btn.unusable:
-        #         ligand_btn.selected = False
+        
+        # Disable corresponding ligand button for selected receptor
+        for item in self._ls_ligands.items:
+            ligand_btn = item.get_content()
+            receptor_btn_txt = receptor_btn.text.value.selected
+            ligand_btn_txt = ligand_btn.text.value.selected
+            ligand_btn.unusable = receptor_btn_txt == ligand_btn_txt
         self.plugin.update_menu(self._menu)
 
     def populate_list(self, ui_list, complex_list, callback=None):
@@ -173,23 +175,6 @@ class MainMenu:
                 btn.register_pressed_callback(callback)
             ui_list.items.append(clone)
         self.plugin.update_content(ui_list)
-
-    def hide_scores(self, show_ligand_names=False):
-        self._to_display = False
-        self._ls_results.items = []
-        if show_ligand_names:
-            for i in range(len(self._ligand_names)):
-                clone = self._pfb_result.clone()
-                lbl = clone._get_content()
-                lbl.text_value = '{}: {}'.format(self._ligand_names[i], "Loading scores")
-                self._ls_results.items.append(clone)
-            self.plugin.update_content(self._ls_results)
-        else:
-            clone = self._pfb_result.clone()
-            lbl = clone._get_content()
-            lbl.text_value = ''
-            self._ls_results.items.append(clone)
-            self.plugin.update_content(self._ls_results)
 
     def update_ligand_scores(self, aggregate_score_list):
         results_list = self.ln_results.get_content()

@@ -37,7 +37,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_positive_score = Color(255, 0, 0, 200)  # Red
         self.realtime_enabled = True
         # api structures
-        self.receptor = None
+        self.receptor_comp = None
         self.ligand_residues = []
         self.complex_cache = {}
 
