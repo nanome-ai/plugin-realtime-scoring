@@ -64,20 +64,22 @@ class RealtimeScoringTestCase(unittest.TestCase):
             create_stream_fut.set_result((stream_mock, unittest.mock.ANY))
             self.plugin.create_writing_stream = MagicMock(return_value=create_stream_fut)
             self.assertEqual(self.plugin.create_writing_stream.call_count, 0)
-            # Run function.
-            # Assert mocks were called
             ligand_residues = list(self.ligand_comp.residues)
+            # Run function.
             await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_residues)
+            # Assert mocks were called
             self.assertEqual(self.plugin.request_complexes.call_count, 1)
             self.assertEqual(shapes.Shape.upload_multiple.call_count, 1)
             self.assertEqual(self.plugin.create_writing_stream.call_count, 3)
+            # Assert receptor and ligand were set
             self.assertEqual(self.plugin.receptor_comp, self.receptor_comp)
             self.assertEqual(self.plugin.ligand_residues, ligand_residues)
         run_awaitable(validate_setup_receptor_and_ligands, self)
 
     def test_score_ligands(self):
         async def validate_score_ligands(self):
-            self.plugin.receptor_comp = self.receptor_comp
+            self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
+            self.plugin.receptor_index = self.receptor_comp.index
             self.plugin.ligand_residues = list(self.ligand_comp.residues)
             self.plugin.color_stream = MagicMock()
             self.plugin.size_stream = MagicMock()
@@ -107,7 +109,9 @@ class RealtimeScoringTestCase(unittest.TestCase):
             ligand_residues = [res for res in comp.residues if res.name == '50D']
             self.assertEqual(len(ligand_residues), 1)
 
-            self.plugin.receptor_comp = self.receptor_comp
+            # Set up plugin state.
+            self.plugin.complex_cache = [self.receptor_comp]
+            self.plugin.receptor_index = self.receptor_comp.index
             self.plugin.ligand_residues = ligand_residues
             self.plugin.color_stream = MagicMock()
             self.plugin.size_stream = MagicMock()

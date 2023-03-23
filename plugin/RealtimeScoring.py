@@ -28,7 +28,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_positive_score = Color(255, 0, 0, 200)  # Red
         self.realtime_enabled = True
         # api structures
-        self.receptor_comp = None
+        self.receptor_index = None
         self.ligand_residues = []
         self.complex_cache = {}
 
@@ -94,7 +94,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     needs_stream_update = True
                     break
             self.complex_cache = updated_comps
-            self.receptor_comp = updated_comps[0]
             # Update ligand residues with updated complexes
             all_comp_residues = itertools.chain(*[comp.residues for comp in self.complex_cache])
             ligand_res_indices = [res.index for res in self.ligand_residues]
@@ -131,6 +130,14 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         """Yield all atoms from all ligands."""
         return self.get_atoms(self.ligand_residues)
 
+    @property
+    def receptor_comp(self) -> structure.Complex:
+        """Get the receptor complex."""
+        return next((
+            comp for comp in self.complex_cache
+            if comp.index == self.receptor_index
+        ), None)
+
     @staticmethod
     def set_atoms_to_workspace_positions(comp_list):
         """Set all atoms in a list of complexes to their positions in the workspace."""
@@ -143,18 +150,17 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     async def setup_receptor_and_ligands(self, receptor_index, ligand_residues):
         # Let's make sure we have deep receptor and ligand complexes
+        self.receptor_index = receptor_index
         ligand_complexes = []
         for res in ligand_residues:
-            if res.complex:
-                ligand_complexes.append(res.complex)
-            else:
-                raise Exception('No Complex associated with Residue')
+            ligand_complexes.append(res.complex)
+
         comp_indices  = [receptor_index] + [cmp.index for cmp in ligand_complexes if cmp.index != receptor_index]
         deep_comps = await self.request_complexes(comp_indices)
-
         # Convert all atoms coordinates to be relative to global workspace.
         self.set_atoms_to_workspace_positions(deep_comps)
-        self.receptor_comp = deep_comps[0]
+        self.complex_cache = deep_comps
+
         all_residues = [res for comp in deep_comps for res in comp.residues]
         selected_res_indices = [res.index for res in ligand_residues]
         self.ligand_residues = list([

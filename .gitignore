@@ -3,7 +3,7 @@ plugin/dsx/results.txt
 /.vscode
 /docker/.cachebust
 /docker/redeploy.sh
-*.log
+*.log*
 *.mol2
 *.pdb
 *.sdf
