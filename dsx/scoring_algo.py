@@ -24,10 +24,10 @@ def score_ligands(receptor: structure.Complex, ligand_comps: list[structure.Comp
     # For each ligand, generate a PDB file and run DSX
     output = []
     for ligand_comp in ligand_comps:
-        ligand_sdf = tempfile.NamedTemporaryFile(suffix='.sdf')
+        ligand_sdf = tempfile.NamedTemporaryFile(delete=False, suffix='.sdf')
         ligand_comp.io.to_sdf(ligand_sdf.name, SDF_OPTIONS)
         # Convert ligand sdf to a mol2.
-        ligand_mol2 = tempfile.NamedTemporaryFile(suffix='.mol2')
+        ligand_mol2 = tempfile.NamedTemporaryFile(delete=False, suffix='.mol2')
         # Convert ligand from sdf to mol2.
         nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
         # Run DSX and retreive data from the subprocess.
@@ -64,13 +64,13 @@ def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
 def nanobabel_convert(input_file, output_file):
     cmd = f'nanobabel convert -i {input_file} -o {output_file}'
     args = shlex.split(cmd)
-    try:
-        popen = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        popen.wait()
-    except Exception:
-        Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
-        return
-
+    pipe = subprocess.PIPE
+    with subprocess.Popen(args, stdout=pipe, stderr=pipe) as popen:
+        try: 
+            popen.wait()
+        except Exception:
+            Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
+            return
 
 def parse_output(dsx_output, ligand_comp):
     """Get per atom scores from output of DSX process."""
