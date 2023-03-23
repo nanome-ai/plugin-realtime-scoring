@@ -48,29 +48,29 @@ class RealtimeScoringTestCase(unittest.TestCase):
     def test_setup_receptor_and_ligands(self):
         async def validate_setup_receptor_and_ligands(self):
             receptor_index = self.receptor_comp.index
+
+            ligand_residue_indices = [res.index for res in self.ligand_comp.residues]
+            ligand_residues = [res for res in self.ligand_comp.residues]
             # Mock Shapes upload_multiple call
             upload_multiple_fut = asyncio.Future()
             upload_multiple_fut.set_result(None)
             shapes.Shape.upload_multiple = MagicMock(return_value=upload_multiple_fut)
 
-            # Mock request complexes call
-            request_complexes_fut = asyncio.Future()
-            request_complexes_fut.set_result([self.receptor_comp, self.ligand_comp])
-            self.plugin.request_complexes = MagicMock(return_value=request_complexes_fut)
+            self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
 
             # Mock create stream calls
             create_stream_fut = asyncio.Future()
             stream_mock = MagicMock()
             create_stream_fut.set_result((stream_mock, unittest.mock.ANY))
             self.plugin.create_writing_stream = MagicMock(return_value=create_stream_fut)
-            self.assertEqual(self.plugin.create_writing_stream.call_count, 0)
-            ligand_residues = list(self.ligand_comp.residues)
+
             # Run function.
-            await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_residues)
+            await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_residue_indices)
+            
             # Assert mocks were called
-            self.assertEqual(self.plugin.request_complexes.call_count, 1)
             self.assertEqual(shapes.Shape.upload_multiple.call_count, 1)
             self.assertEqual(self.plugin.create_writing_stream.call_count, 3)
+
             # Assert receptor and ligand were set
             self.assertEqual(self.plugin.receptor_comp, self.receptor_comp)
             self.assertEqual(self.plugin.ligand_residues, ligand_residues)
@@ -80,7 +80,9 @@ class RealtimeScoringTestCase(unittest.TestCase):
         async def validate_score_ligands(self):
             self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
             self.plugin.receptor_index = self.receptor_comp.index
-            self.plugin.ligand_residues = list(self.ligand_comp.residues)
+
+            self.plugin.ligand_residue_indices = [
+                res.index for res in self.ligand_comp.residues]
             self.plugin.color_stream = MagicMock()
             self.plugin.size_stream = MagicMock()
             self.plugin.label_stream = MagicMock()
@@ -106,13 +108,16 @@ class RealtimeScoringTestCase(unittest.TestCase):
             pdb_path = os.path.join(assets_dir, '5ceo.pdb')
             comp = structure.Complex.io.from_pdb(path=pdb_path)
             self.generate_random_indices(comp)
-            ligand_residues = [res for res in comp.residues if res.name == '50D']
-            self.assertEqual(len(ligand_residues), 1)
+
+            # Residues we will be using as a ligand
+            ligand_residue_indices = [
+                res.index for res in comp.residues
+                if res.name == '50D']
 
             # Set up plugin state.
-            self.plugin.complex_cache = [self.receptor_comp]
-            self.plugin.receptor_index = self.receptor_comp.index
-            self.plugin.ligand_residues = ligand_residues
+            self.plugin.complex_cache = [comp]
+            self.plugin.receptor_index = comp.index
+            self.plugin.ligand_residue_indices = ligand_residue_indices
             self.plugin.color_stream = MagicMock()
             self.plugin.size_stream = MagicMock()
             self.plugin.label_stream = MagicMock()

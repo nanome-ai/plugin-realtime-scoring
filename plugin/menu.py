@@ -38,20 +38,22 @@ class MainMenu:
 
     async def start_scoring(self):
         receptor_index = self.receptor_index
-        ligand_residues = self.ligand_residues
+        residue_indices = self.ligand_residue_indices
         Logs.message("Start Scoring")
-        Logs.debug(f"Residue Count: {len(ligand_residues)}")
+        Logs.debug(f"Residue Count: {len(residue_indices)}")
         if self.plugin.realtime_enabled:
             # Don't switch panels if realtime is enabled
             self.ln_selection.enabled = False
             self.ln_results.enabled = True
 
         if receptor_index is None:
-            self.plugin.send_notification(NotificationTypes.error, "Please select a receptor")
+            self.plugin.send_notification(
+                NotificationTypes.error, "Please select a receptor")
             return
 
-        if len(ligand_residues) == 0:
-            self.plugin.send_notification(NotificationTypes.error, "Please select at least one ligand")
+        if len(residue_indices) == 0:
+            self.plugin.send_notification(
+                NotificationTypes.error, "Please select at least one ligand")
             return
 
         # Add loading message to results panel
@@ -65,7 +67,7 @@ class MainMenu:
             self.plugin.update_menu(self._menu)
 
         await self.plugin.setup_receptor_and_ligands(
-            receptor_index, ligand_residues)
+            receptor_index, residue_indices)
         await self.plugin.score_ligands()
         if self.plugin.realtime_enabled:
             self._menu.title = "Scores"
@@ -101,13 +103,13 @@ class MainMenu:
                 return item.get_content().index
 
     @property
-    def ligand_residues(self):
+    def ligand_residue_indices(self):
         """Get the list of residues from the currently selected buttons."""
         residues = []
         for item in self._ls_ligands.items:
             btn = item.get_content()
-            if btn.selected and hasattr(btn, 'residue_list'):
-                residues.extend(btn.residue_list)
+            if btn.selected and hasattr(btn, 'residue_indices'):
+                residues.extend(btn.residue_indices)
         return residues
 
     @async_callback
@@ -142,7 +144,7 @@ class MainMenu:
             btn = clone.get_content()
             btn.text.value.set_all(lig.name)
             btn.index = receptor.index
-            btn.residue_list = list(lig.residues)
+            btn.residue_indices = [res.index for res in lig.residues]
             btn.extracted_ligand = True
             # make sure structure tree is stored on residue, we will need it later
             for residue in lig.residues:
@@ -164,12 +166,12 @@ class MainMenu:
 
     def populate_list(self, ui_list, complex_list, callback=None):
         ui_list.items = []
-        for complex in complex_list:
+        for comp in complex_list:
             clone = self._pfb_complex.clone()
             btn = clone.get_content()
-            btn.text.value.set_all(complex.full_name)
-            btn.index = complex.index
-            btn.residue_list = complex.residues
+            btn.text.value.set_all(comp.full_name)
+            btn.index = comp.index
+            btn.residue_indices = [res.index for res in comp.residues]
             if callback:
                 btn.register_pressed_callback(callback)
             ui_list.items.append(clone)
