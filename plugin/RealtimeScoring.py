@@ -109,10 +109,10 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             ligand_res_indices = [res.index for res in self.ligand_residues]
             self.ligand_residues = [res for res in all_comp_residues if res.index in ligand_res_indices]
             if needs_stream_update:
-                Logs.debug("Ligand has changed. Updating streams.")
+                Logs.message("Receptor or ligand modified. Updating streams.")
                 await self.start_ligand_streams(self.ligand_atoms)
             if needs_rescore:
-                Logs.debug("Positions changed. Rescoring Ligands.")
+                Logs.message("Complex Positions changed. Rescoring Ligands.")
                 await self.score_ligands()
             self.is_updating = False
 

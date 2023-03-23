@@ -40,7 +40,6 @@ class MainMenu:
         receptor_index = self.receptor_index
         ligand_residues = self.ligand_residues
         Logs.message("Start Scoring")
-        Logs.debug(ligand_residues)
         Logs.debug(f"Residue Count: {len(ligand_residues)}")
         if self.plugin.realtime_enabled:
             # Don't switch panels if realtime is enabled
