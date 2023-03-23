@@ -13,15 +13,6 @@ from .menu import MainMenu
 from plugin import utils
 
 
-SDF_OPTIONS = structure.Complex.io.SDFSaveOptions()
-SDF_OPTIONS.write_bonds = True
-PDB_OPTIONS = structure.Complex.io.PDBSaveOptions()
-PDB_OPTIONS.write_bonds = True
-
-DIR = os.path.dirname(__file__)
-RESULTS_PATH = os.path.join(DIR, 'dsx', 'results.txt')
-
-
 class RealtimeScoring(nanome.AsyncPluginInstance):
 
     scoring_algorithm = scoring_algo.score_ligands
