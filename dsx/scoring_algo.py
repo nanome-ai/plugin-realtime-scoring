@@ -66,11 +66,12 @@ def nanobabel_convert(input_file, output_file):
     args = shlex.split(cmd)
     pipe = subprocess.PIPE
     with subprocess.Popen(args, stdout=pipe, stderr=pipe) as popen:
-        try: 
+        try:
             popen.wait()
         except Exception:
             Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
             return
+
 
 def parse_output(dsx_output, ligand_comp):
     """Get per atom scores from output of DSX process."""

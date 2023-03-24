@@ -104,7 +104,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                     break
 
             # Update cached complexes
-            for i in range(len(self.complex_cache) -1, -1, -1):
+            for i in range(len(self.complex_cache) - 1, -1, -1):
                 cached_comp = self.complex_cache[i]
                 if cached_comp.index in comp_indices:
                     updated_version = next(cmp for cmp in updated_comps if cmp.index == cached_comp.index)

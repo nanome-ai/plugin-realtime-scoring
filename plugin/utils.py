@@ -21,7 +21,6 @@ class ScoringOutputSchema(Schema):
         required=True)
 
 
-
 def extract_residues_from_complex(comp, residue_list, comp_name=None):
     """Copy comp, and remove all residues that are not part of the binding site."""
     new_comp = structure.Complex()
