@@ -73,6 +73,7 @@ class MainMenu:
             self._menu.title = "Scores"
 
     def stop_scoring(self):
+        Logs.message("Stopping Scoring Streams")
         self.plugin.stop_streams()
         self.ln_selection.enabled = True
         self.ln_results.enabled = False

@@ -77,6 +77,17 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
             comp_indices = set([self.receptor_comp.index] + list(lig_comp_indices))
             updated_comps = await self.request_complexes(comp_indices)
+            # If any of the complexes were deleted, destroy the streams
+            if any([comp is None for comp in updated_comps]):
+                Logs.message("Receptor or ligand deleted. Stopping streams.")
+                # Use the score button so that the UI is updated.
+                btn_score = self.menu.btn_score
+                btn_score.selected = False
+                self.menu.on_scoring_button_pressed(btn_score)
+                self.receptor_index = None
+                self.ligand_residue_indices = []
+                return
+
             self.set_atoms_to_workspace_positions(updated_comps)
             self.last_update = datetime.now()
             # Check if positions have changed in workspace
@@ -102,9 +113,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
                         Logs.debug("Updating cached complex")
                         self.complex_cache[i] = updated_version
             # Update ligand residues with updated complexes
-            all_comp_residues = itertools.chain(*[comp.residues for comp in self.complex_cache])
-            ligand_res_indices = [res.index for res in self.ligand_residues]
-            self.ligand_residues = [res for res in all_comp_residues if res.index in ligand_res_indices]
             if needs_stream_update:
                 Logs.message("Receptor or ligand modified. Recreating streams.")
                 await self.start_ligand_streams(self.ligand_atoms)
@@ -169,7 +177,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         # Let's make sure we have deep receptor and ligand complexes
         self.receptor_index = receptor_index
         self.ligand_residue_indices = residue_indices
-        all_residues = (res for comp in self.complex_cache for res in comp.residues)
         await self.start_ligand_streams(self.ligand_atoms)
 
     async def score_ligands(self):
