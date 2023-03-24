@@ -9,5 +9,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: pip install -r requirements.txt
-    - run: conda env update -f arpeggio_environ.yml
-    - run: python run_tests.py
+    - run: python -m unittest discover tests
