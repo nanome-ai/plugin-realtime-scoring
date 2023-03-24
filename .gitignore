@@ -1,13 +1,12 @@
 __pycache__
-plugin/dsx/results.txt
 /.vscode
 /docker/.cachebust
 /docker/redeploy.sh
 *.log*
 *.mol2
 *.pdb
+!tests/assets/*
 *.sdf
-*dsx*.txt
 .env*
 venv
 custom_scoring
