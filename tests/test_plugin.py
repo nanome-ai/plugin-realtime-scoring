@@ -66,7 +66,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
 
             # Run function.
             await self.plugin.setup_receptor_and_ligands(receptor_index, ligand_residue_indices)
-            
+
             # Assert mocks were called
             self.assertEqual(shapes.Shape.upload_multiple.call_count, 1)
             self.assertEqual(self.plugin.create_writing_stream.call_count, 3)
@@ -101,7 +101,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.assertEqual(self.plugin.size_stream.update.call_count, 2)
             self.assertEqual(self.plugin.label_stream.update.call_count, 1)
         run_awaitable(validate_score_ligands, self)
-    
+
     def test_score_ligand_one_complex(self):
         """Validate score ligand when ligand and receptor are same Complex."""
         async def validate_score_ligands_one_complex(self):

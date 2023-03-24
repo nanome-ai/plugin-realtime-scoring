@@ -21,7 +21,7 @@ class MainMenu:
         self.btn_score: ui.Button = self._menu.root.find_node("btn_score", True).get_content()
         self.btn_score.register_pressed_callback(self.on_scoring_button_pressed)
         self.btn_score.toggle_on_press = True
-        
+
         self._pfb_complex = nanome.ui.LayoutNode()
         pfb_btn = self._pfb_complex.add_new_button()
         pfb_btn.toggle_on_press = True
@@ -156,7 +156,7 @@ class MainMenu:
                 )
                 residue._parent = res_chain
             self._ls_ligands.items.append(clone)
-        
+
         # Disable corresponding ligand button for selected receptor
         for item in self._ls_ligands.items:
             ligand_btn = item.get_content()
