@@ -1,4 +1,3 @@
-import itertools
 import nanome
 from datetime import datetime, timedelta
 from nanome.api import structure
@@ -7,8 +6,8 @@ from nanome.util import async_callback, Logs, Color, enums
 
 from dsx import scoring_algo
 from scoring_schema import ScoringOutputSchema
-from .SettingsMenu import SettingsMenu
-from .menu import MainMenu
+from plugin.SettingsMenu import SettingsMenu
+from plugin.menu import MainMenu
 from plugin import utils
 
 
