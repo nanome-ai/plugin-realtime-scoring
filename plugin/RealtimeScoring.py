@@ -5,7 +5,7 @@ from nanome.api.shapes import Shape, Sphere
 from nanome.util import async_callback, Logs, Color, enums
 
 from dsx import scoring_algo
-from scoring_schema import ScoringOutputSchema
+from plugin.utils import ScoringOutputSchema
 from plugin.SettingsMenu import SettingsMenu
 from plugin.menu import MainMenu
 from plugin import utils
