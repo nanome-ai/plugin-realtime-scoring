@@ -20,7 +20,7 @@ PDB_OPTIONS.write_bonds = True
 def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Complex]'):
     output = []
     with tempfile.TemporaryDirectory() as dir:
-        receptor_pdb = tempfile.NamedTemporaryFile(dir=dir, suffix='.pdb')
+        receptor_pdb = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.pdb')
         receptor.io.to_pdb(receptor_pdb.name, PDB_OPTIONS)
         # For each ligand, generate a PDB file and run DSX
         for ligand_comp in ligand_comps:
@@ -31,7 +31,7 @@ def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Com
             # Convert ligand from sdf to mol2.
             nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
             # Run DSX and retreive data from the subprocess.
-            dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, suffix='.txt')
+            dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.txt')
             dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
             atom_scores = parse_output(dsx_output, ligand_comp)
             aggregate_scores = parse_results(dsx_results_file.name)

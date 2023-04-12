@@ -33,9 +33,9 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     def start(self):
         # Update settings based on custom data added at runtime.
         custom_data = {}
-        if self._custom_data:
+        if self.custom_data:
             try:
-                custom_data = self._custom_data[0]
+                custom_data = self.custom_data[0]
             except (IndexError, AttributeError):
                 pass
 
@@ -122,7 +122,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     async def start_ligand_streams(self, ligand_atoms):
         """Set up streams and Shapes used for rendering scoring results."""
-        if hasattr(self, 'spheres') and getattr(self, 'spheres', None):
+        if getattr(self, 'spheres', None):
             await Shape.destroy_multiple(self.spheres)
         self.spheres = self.generate_spheres(self.ligand_atoms)
         await Shape.upload_multiple(self.spheres)
@@ -208,7 +208,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
         validation_errors = ScoringOutputSchema(many=True).validate(ligand_scores)
         if validation_errors:
-            # Logs.error("Validation errors: ", validation_errors)
             raise ValueError("Validation errors: ", validation_errors)
         return ligand_scores
 
