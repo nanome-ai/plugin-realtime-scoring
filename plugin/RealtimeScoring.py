@@ -323,11 +323,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.settings.open_menu()
 
     @async_callback
-    async def on_complex_added(self):
-        comp_list = await self.request_complex_list()
-        await self.menu.render(comp_list)
-
-    @async_callback
-    async def on_complex_removed(self):
+    async def on_complex_list_changed(self):
         comp_list = await self.request_complex_list()
         await self.menu.render(comp_list)
