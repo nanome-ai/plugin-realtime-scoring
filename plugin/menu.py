@@ -1,6 +1,6 @@
 import nanome
 from os import path
-from nanome.api import ui
+from nanome.api import ui, shapes
 from nanome.util import Logs, async_callback
 from nanome.util.enums import NotificationTypes
 
@@ -74,7 +74,7 @@ class MainMenu:
 
     def stop_scoring(self):
         Logs.message("Stopping Scoring Streams")
-        self.plugin.stop_streams()
+        self.plugin.stop_scoring()
         self.ln_selection.enabled = True
         self.ln_results.enabled = False
         self.plugin.update_menu(self._menu)

@@ -122,8 +122,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     async def start_ligand_streams(self, ligand_atoms):
         """Set up streams and Shapes used for rendering scoring results."""
-        if getattr(self, 'spheres', None):
-            await Shape.destroy_multiple(self.spheres)
+        self.destroy_spheres()
         self.spheres = self.generate_spheres(self.ligand_atoms)
         await Shape.upload_multiple(self.spheres)
         atom_indices = [atom.index for atom in ligand_atoms]
@@ -317,6 +316,14 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_stream = None
         self.label_stream = None
         self.size_stream = None
+    
+    def stop_scoring(self):
+        self.stop_streams()
+        self.destroy_spheres()
+    
+    def destroy_spheres(self):
+        if getattr(self, 'spheres', False):
+            Shape.destroy_multiple(self.spheres)
 
     def on_advanced_settings(self):
         self.settings.open_menu()
