@@ -316,11 +316,11 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.color_stream = None
         self.label_stream = None
         self.size_stream = None
-    
+
     def stop_scoring(self):
         self.stop_streams()
         self.destroy_spheres()
-    
+
     def destroy_spheres(self):
         if getattr(self, 'spheres', False):
             Shape.destroy_multiple(self.spheres)
