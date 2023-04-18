@@ -1,1 +1,2 @@
-nanome==0.39.3
+nanome==0.40.0
+marshmallow==3.18.0
