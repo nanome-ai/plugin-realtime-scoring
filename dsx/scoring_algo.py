@@ -4,8 +4,7 @@ import subprocess
 import shlex
 import tempfile
 from nanome.api import structure
-from nanome.util import Logs
-
+from nanome.util import Logs, Process
 
 __all__ = ['score_ligands']
 
@@ -53,12 +52,16 @@ def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
         '-pp', '-F', output_file_path
     ]
     try:
-        dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'bin'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        dsx_process = Process(dsx_path, dsx_args, output_text=True, buffer_lines=True, label="DSX")
+        dsx_output_file = tempfile.TemporaryFile()
+        dsx_process.on_output = dsx_output_file.write
+        # dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'bin'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        dsx_process.start()
     except Exception:
         Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
+        dsx_output_file.close()
         return
-    dsx_process.wait()
-    dsx_output, _ = dsx_process.communicate()
+    dsx_output, _ = dsx_output_file.read()
     return dsx_output
 
 

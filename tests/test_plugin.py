@@ -44,6 +44,13 @@ class RealtimeScoringTestCase(unittest.TestCase):
         PluginInstance._instance = self.plugin
         self.plugin._network = MagicMock()
         nanome._internal.network.plugin_network.PluginNetwork._instance = MagicMock()
+        # Mock args that are passed to setup plugin instance networking
+        session_id = plugin_network = pm_queue_in = pm_queue_out = custom_data = \
+            log_pipe_conn = original_version_table = permissions = MagicMock()
+        self.plugin._setup(
+            session_id, plugin_network, pm_queue_in, pm_queue_out, log_pipe_conn,
+            original_version_table, custom_data, permissions
+        )
 
     def test_setup_receptor_and_ligands(self):
         async def validate_setup_receptor_and_ligands(self):
