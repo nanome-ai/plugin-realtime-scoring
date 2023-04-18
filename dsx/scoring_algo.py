@@ -46,6 +46,7 @@ def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Com
 
 def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
     """Run DSX and write output to provided output_file."""
+    # TODO: Refactor to use Process API
     dsx_path = os.path.join(DIR, 'bin', 'dsx_linux_64.lnx')
     dsx_args = [
         dsx_path, '-P', receptor_pdb, '-L', ligands_mol2, '-D', 'pdb_pot_0511',
@@ -62,6 +63,7 @@ def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
 
 
 def nanobabel_convert(input_file, output_file):
+    # TODO: Refactor to use Process API
     cmd = f'nanobabel convert -i {input_file} -o {output_file}'
     args = shlex.split(cmd)
     pipe = subprocess.PIPE
