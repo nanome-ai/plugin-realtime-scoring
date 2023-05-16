@@ -78,7 +78,7 @@ async def nanobabel_convert(input_file, output_file):
     cmd_args = ['convert', '-i', input_file, '-o', output_file]
     nanobabel_process = Process(nanobabel_path, cmd_args, label="nanobabel", output_text=True)
     await nanobabel_process.start()
-    
+
 
 def parse_output(dsx_output, ligand_comp):
     """Get per atom scores from output of DSX process."""
