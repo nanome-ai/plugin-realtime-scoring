@@ -181,7 +181,11 @@ class MainMenu:
     def update_ligand_scores(self, aggregate_score_list):
         results_list = self.ln_results.get_content()
         results_list.items = []
-        scores = aggregate_score_list[0][0]
+        scores_set = aggregate_score_list[0]
+        if not scores_set:
+            Logs.warning("No aggregate scores returned by scoring algorithm.")
+            return
+        scores = scores_set[0]
         for name, score in scores.items():
             clone = self._pfb_result.clone()
             lbl = clone._get_content()

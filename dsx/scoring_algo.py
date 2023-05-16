@@ -1,11 +1,9 @@
 import itertools
+import io
 import os
-import subprocess
-import shlex
 import tempfile
 from nanome.api import structure
-from nanome.util import Logs
-
+from nanome.util import Logs, Process
 
 __all__ = ['score_ligands']
 
@@ -17,7 +15,7 @@ PDB_OPTIONS = structure.Complex.io.PDBSaveOptions()
 PDB_OPTIONS.write_bonds = True
 
 
-def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Complex]'):
+async def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Complex]'):
     output = []
     with tempfile.TemporaryDirectory() as dir:
         receptor_pdb = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.pdb')
@@ -29,10 +27,10 @@ def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Com
             # Convert ligand sdf to a mol2.
             ligand_mol2 = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.mol2')
             # Convert ligand from sdf to mol2.
-            nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
+            await nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
             # Run DSX and retreive data from the subprocess.
             dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.txt')
-            dsx_output = run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
+            dsx_output = await run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
             atom_scores = parse_output(dsx_output, ligand_comp)
             aggregate_scores = parse_results(dsx_results_file.name)
             ligand_data = {
@@ -44,35 +42,32 @@ def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structure.Com
     return output
 
 
-def run_dsx(receptor_pdb, ligands_mol2, output_file_path):
+async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     """Run DSX and write output to provided output_file."""
-    # TODO: Refactor to use Process API
     dsx_path = os.path.join(DIR, 'bin', 'dsx_linux_64.lnx')
+    pdb_pot_0511 = os.path.join(DIR, 'bin', 'pdb_pot_0511')
     dsx_args = [
-        dsx_path, '-P', receptor_pdb, '-L', ligands_mol2, '-D', 'pdb_pot_0511',
+        dsx_path, '-P', receptor_pdb, '-L', ligands_mol2, '-D', pdb_pot_0511,
         '-pp', '-F', output_file_path
     ]
+    dsx_stdout = io.StringIO()
     try:
-        dsx_process = subprocess.Popen(dsx_args, cwd=os.path.join(DIR, 'bin'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        dsx_process = Process(dsx_path, dsx_args, label="DSX", output_text=True)
+        dsx_output_file = tempfile.NamedTemporaryFile()
+        dsx_process.on_output = lambda output: dsx_stdout.write(output + '\n')
+        await dsx_process.start()
     except Exception:
         Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
+        dsx_output_file.close()
         return
-    dsx_process.wait()
-    dsx_output, _ = dsx_process.communicate()
-    return dsx_output
+    return dsx_stdout.getvalue()
 
 
-def nanobabel_convert(input_file, output_file):
-    # TODO: Refactor to use Process API
-    cmd = f'nanobabel convert -i {input_file} -o {output_file}'
-    args = shlex.split(cmd)
-    pipe = subprocess.PIPE
-    with subprocess.Popen(args, stdout=pipe, stderr=pipe) as popen:
-        try:
-            popen.wait()
-        except Exception:
-            Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
-            return
+async def nanobabel_convert(input_file, output_file):
+    nanobabel_path = 'nanobabel'
+    cmd_args = ['convert', '-i', input_file, '-o', output_file]
+    nanobabel_process = Process(nanobabel_path, cmd_args, label="nanobabel", output_text=True)
+    await nanobabel_process.start()
 
 
 def parse_output(dsx_output, ligand_comp):

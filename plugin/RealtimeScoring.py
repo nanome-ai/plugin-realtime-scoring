@@ -1,3 +1,4 @@
+import inspect
 import nanome
 from datetime import datetime, timedelta
 from nanome.api import structure
@@ -204,7 +205,13 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         ligand_comps = list(set([lig.complex for lig in ligand_residues]))
         for i, lig in enumerate(ligand_comps):
             ligand_comps[i] = utils.extract_residues_from_complex(lig, ligand_residues)
-        ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
+
+        # Await scoring algorithm if it is a coroutine
+        if inspect.iscoroutinefunction(cls.scoring_algorithm):
+            ligand_scores = await cls.scoring_algorithm(receptor_comp, ligand_comps)
+        else:
+            ligand_scores = cls.scoring_algorithm(receptor_comp, ligand_comps)
+
         validation_errors = ScoringOutputSchema(many=True).validate(ligand_scores)
         if validation_errors:
             raise ValueError("Validation errors: ", validation_errors)

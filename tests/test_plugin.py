@@ -4,9 +4,9 @@ import nanome
 import os
 import unittest
 from unittest.mock import MagicMock
-
 from nanome.api import structure, PluginInstance, shapes
-from dsx.scoring_algo import parse_output
+from nanome.util import Process
+from dsx import scoring_algo
 from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
 
@@ -40,10 +40,19 @@ class RealtimeScoringTestCase(unittest.TestCase):
                 atom.index = randint(1000000000, 9999999999)
 
     def setUp(self):
+        RealtimeScoring.scoring_algorithm = scoring_algo.score_ligands
         self.plugin = RealtimeScoring()
         PluginInstance._instance = self.plugin
         self.plugin._network = MagicMock()
         nanome._internal.network.plugin_network.PluginNetwork._instance = MagicMock()
+        # Mock args that are passed to setup plugin instance networking
+        session_id = plugin_network = pm_queue_in = pm_queue_out = custom_data = \
+            log_pipe_conn = original_version_table = permissions = MagicMock()
+        self.plugin._setup(
+            session_id, plugin_network, pm_queue_in, pm_queue_out, log_pipe_conn,
+            original_version_table, custom_data, permissions
+        )
+        Process._manager = None
 
     def test_setup_receptor_and_ligands(self):
         async def validate_setup_receptor_and_ligands(self):
@@ -137,6 +146,40 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.assertEqual(self.plugin.size_stream.update.call_count, 2)
             self.assertEqual(self.plugin.label_stream.update.call_count, 1)
         run_awaitable(validate_score_ligands_one_complex, self)
+
+    def test_non_async_scoring_algo(self):
+        """Ensure that a non-async function can be used as scoring algorithm."""
+        def non_async_scoring_algo(receptor, ligand_comps):
+            # Trivial scoring algorithm that returns valid output.
+            ligand_scores = []
+            for comp in ligand_comps:
+                comp_data = {
+                    'complex_index': comp.index,
+                    'aggregate_scores': [],
+                    'atom_scores': [
+                        (atom.index, 1.0) for atom in comp.atoms
+                    ]
+                }
+                ligand_scores.append(comp_data)
+            return ligand_scores
+
+        async def validate_non_async_scoring_algo(self):
+            RealtimeScoring.scoring_algorithm = non_async_scoring_algo
+            self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
+            self.plugin.receptor_index = self.receptor_comp.index
+            self.plugin.ligand_residue_indices = [
+                res.index for res in self.ligand_comp.residues]
+            self.plugin.color_stream = MagicMock()
+            self.plugin.size_stream = MagicMock()
+            self.plugin.label_stream = MagicMock()
+            # Run function
+            self.plugin.settings.update_labels = True
+            await self.plugin.score_ligands()
+            # Assert stream updates were called
+            self.assertEqual(self.plugin.color_stream.update.call_count, 1)
+            self.assertEqual(self.plugin.size_stream.update.call_count, 1)
+            self.assertEqual(self.plugin.label_stream.update.call_count, 1)
+        run_awaitable(validate_non_async_scoring_algo, self)
 
     @staticmethod
     def generate_random_indices(comp):
