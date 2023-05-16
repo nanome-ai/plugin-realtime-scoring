@@ -1,8 +1,6 @@
 import functools
 import itertools
 import os
-import subprocess
-import shlex
 import tempfile
 from nanome.api import structure
 from nanome.util import Logs, Process
@@ -45,9 +43,7 @@ async def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structu
 
 
 def on_dsx_stdout(file, output):
-    if output != '':
-        with open(file.name, 'a') as f:
-            f.write(output + '\n')
+    file.write(output + '\n')
 
 
 async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
@@ -61,8 +57,8 @@ async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     ]
     try:
         dsx_process = Process(dsx_path, dsx_args, label="DSX", output_text=True)
-        dsx_output_file = tempfile.TemporaryFile()
-        with open(dsx_stdout_file.name) as f:
+        dsx_output_file = tempfile.NamedTemporaryFile()
+        with open(dsx_stdout_file.name, 'a') as f:
             dsx_process.on_output = functools.partial(on_dsx_stdout, f)
             await dsx_process.start()
     except Exception:
