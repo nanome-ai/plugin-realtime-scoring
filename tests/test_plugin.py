@@ -156,10 +156,10 @@ class RealtimeScoringTestCase(unittest.TestCase):
                 comp_data = {
                     'complex_index': comp.index,
                     'aggregate_scores': [],
-                    'atom_scores': []
+                    'atom_scores': [
+                        (atom.index, 1.0) for atom in comp.atoms
+                    ]
                 }
-                for atom in comp.atoms:
-                    comp_data['atom_scores'].append((atom.index, 1.0))
                 ligand_scores.append(comp_data)
             return ligand_scores
 
