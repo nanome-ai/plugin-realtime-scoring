@@ -29,7 +29,7 @@ async def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structu
             # Convert ligand sdf to a mol2.
             ligand_mol2 = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.mol2')
             # Convert ligand from sdf to mol2.
-            nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
+            await nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
             # Run DSX and retreive data from the subprocess.
             dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, suffix='.txt')
             dsx_output = await run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
@@ -73,18 +73,12 @@ async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     return dsx_stdout.decode()
 
 
-def nanobabel_convert(input_file, output_file):
-    # TODO: Refactor to use Process API
-    cmd = f'nanobabel convert -i {input_file} -o {output_file}'
-    args = shlex.split(cmd)
-    pipe = subprocess.PIPE
-    with subprocess.Popen(args, stdout=pipe, stderr=pipe) as popen:
-        try:
-            popen.wait()
-        except Exception:
-            Logs.error("Couldn't execute nanobabel, please check if packet 'openbabel' is installed")
-            return
-
+async def nanobabel_convert(input_file, output_file):
+    nanobabel_path = 'nanobabel'
+    cmd_args = ['convert', '-i', input_file, '-o', output_file]
+    nanobabel_process = Process(nanobabel_path, cmd_args, label="nanobabel")
+    await nanobabel_process.start()
+    
 
 def parse_output(dsx_output, ligand_comp):
     """Get per atom scores from output of DSX process."""
