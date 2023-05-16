@@ -1,5 +1,5 @@
-import functools
 import itertools
+import io
 import os
 import tempfile
 from nanome.api import structure
@@ -42,31 +42,25 @@ async def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structu
     return output
 
 
-def on_dsx_stdout(file, output):
-    file.write(output + '\n')
-
-
 async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     """Run DSX and write output to provided output_file."""
     dsx_path = os.path.join(DIR, 'bin', 'dsx_linux_64.lnx')
     pdb_pot_0511 = os.path.join(DIR, 'bin', 'pdb_pot_0511')
-    dsx_stdout_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
     dsx_args = [
         dsx_path, '-P', receptor_pdb, '-L', ligands_mol2, '-D', pdb_pot_0511,
         '-pp', '-F', output_file_path
     ]
+    dsx_stdout = io.StringIO()
     try:
         dsx_process = Process(dsx_path, dsx_args, label="DSX", output_text=True)
         dsx_output_file = tempfile.NamedTemporaryFile()
-        with open(dsx_stdout_file.name, 'a') as f:
-            dsx_process.on_output = functools.partial(on_dsx_stdout, f)
-            await dsx_process.start()
+        dsx_process.on_output = lambda output: dsx_stdout.write(output + '\n')
+        await dsx_process.start()
     except Exception:
         Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
         dsx_output_file.close()
         return
-    dsx_stdout = dsx_stdout_file.read()
-    return dsx_stdout.decode()
+    return dsx_stdout.getvalue()
 
 
 async def nanobabel_convert(input_file, output_file):
