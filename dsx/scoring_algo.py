@@ -53,12 +53,10 @@ async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     dsx_stdout = io.StringIO()
     try:
         dsx_process = Process(dsx_path, dsx_args, label="DSX", output_text=True)
-        dsx_output_file = tempfile.NamedTemporaryFile()
         dsx_process.on_output = lambda output: dsx_stdout.write(output + '\n')
         await dsx_process.start()
     except Exception:
         Logs.error("Couldn't execute dsx, please check if executable is in the plugin folder and has permissions. Try executing chmod +x " + dsx_path)
-        dsx_output_file.close()
         return
     return dsx_stdout.getvalue()
 
