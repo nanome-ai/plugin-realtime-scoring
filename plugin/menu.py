@@ -183,7 +183,7 @@ class MainMenu:
         results_list.items = []
         scores_set = aggregate_score_list[0]
         if not scores_set:
-            Logs.warning("No aggregate scores returned by algorithm.")
+            Logs.warning("No aggregate scores returned by scoring algorithm.")
             return
         scores = scores_set[0]
         for name, score in scores.items():
