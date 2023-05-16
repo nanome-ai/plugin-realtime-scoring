@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from nanome.api import structure, PluginInstance, shapes
+from nanome.util import Process
 from dsx.scoring_algo import parse_output
 from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
@@ -51,6 +52,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
             session_id, plugin_network, pm_queue_in, pm_queue_out, log_pipe_conn,
             original_version_table, custom_data, permissions
         )
+        Process._manager = None
 
     def test_setup_receptor_and_ligands(self):
         async def validate_setup_receptor_and_ligands(self):
