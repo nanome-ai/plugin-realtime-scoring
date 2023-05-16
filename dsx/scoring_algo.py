@@ -31,7 +31,7 @@ async def score_ligands(receptor: structure.Complex, ligand_comps: 'list[structu
             # Convert ligand from sdf to mol2.
             await nanobabel_convert(ligand_sdf.name, ligand_mol2.name)
             # Run DSX and retreive data from the subprocess.
-            dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, suffix='.txt')
+            dsx_results_file = tempfile.NamedTemporaryFile(dir=dir, delete=False, suffix='.txt')
             dsx_output = await run_dsx(receptor_pdb.name, ligand_mol2.name, dsx_results_file.name)
             atom_scores = parse_output(dsx_output, ligand_comp)
             aggregate_scores = parse_results(dsx_results_file.name)
@@ -54,7 +54,7 @@ async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
     """Run DSX and write output to provided output_file."""
     dsx_path = os.path.join(DIR, 'bin', 'dsx_linux_64.lnx')
     pdb_pot_0511 = os.path.join(DIR, 'bin', 'pdb_pot_0511')
-    dsx_stdout_file = tempfile.NamedTemporaryFile(suffix='.txt')
+    dsx_stdout_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
     dsx_args = [
         dsx_path, '-P', receptor_pdb, '-L', ligands_mol2, '-D', pdb_pot_0511,
         '-pp', '-F', output_file_path
@@ -76,7 +76,7 @@ async def run_dsx(receptor_pdb, ligands_mol2, output_file_path) -> str:
 async def nanobabel_convert(input_file, output_file):
     nanobabel_path = 'nanobabel'
     cmd_args = ['convert', '-i', input_file, '-o', output_file]
-    nanobabel_process = Process(nanobabel_path, cmd_args, label="nanobabel")
+    nanobabel_process = Process(nanobabel_path, cmd_args, label="nanobabel", output_text=True)
     await nanobabel_process.start()
     
 

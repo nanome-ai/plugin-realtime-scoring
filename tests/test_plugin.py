@@ -148,7 +148,8 @@ class RealtimeScoringTestCase(unittest.TestCase):
         run_awaitable(validate_score_ligands_one_complex, self)
 
     def test_non_async_scoring_algo(self):
-        def basic_scoring_algo(receptor: structure.Complex, ligand_comps: 'list[structure.Complex]'):
+        """Ensure that a non-async function can be used as scoring algorithm."""
+        def non_async_scoring_algo(receptor, ligand_comps):
             # Trivial scoring algorithm that returns valid output.
             ligand_scores = []
             for comp in ligand_comps:
@@ -163,9 +164,9 @@ class RealtimeScoringTestCase(unittest.TestCase):
             return ligand_scores
 
         async def validate_non_async_scoring_algo(self):
+            RealtimeScoring.scoring_algorithm = non_async_scoring_algo
             self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
             self.plugin.receptor_index = self.receptor_comp.index
-            RealtimeScoring.scoring_algorithm = basic_scoring_algo
             self.plugin.ligand_residue_indices = [
                 res.index for res in self.ligand_comp.residues]
             self.plugin.color_stream = MagicMock()
