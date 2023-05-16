@@ -4,10 +4,9 @@ import nanome
 import os
 import unittest
 from unittest.mock import MagicMock
-
 from nanome.api import structure, PluginInstance, shapes
 from nanome.util import Process
-from dsx.scoring_algo import parse_output
+from dsx import scoring_algo
 from plugin.RealtimeScoring import RealtimeScoring
 from random import randint
 
@@ -41,6 +40,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
                 atom.index = randint(1000000000, 9999999999)
 
     def setUp(self):
+        RealtimeScoring.scoring_algorithm = scoring_algo.score_ligands
         self.plugin = RealtimeScoring()
         PluginInstance._instance = self.plugin
         self.plugin._network = MagicMock()
