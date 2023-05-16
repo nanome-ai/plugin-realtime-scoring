@@ -147,6 +147,39 @@ class RealtimeScoringTestCase(unittest.TestCase):
             self.assertEqual(self.plugin.label_stream.update.call_count, 1)
         run_awaitable(validate_score_ligands_one_complex, self)
 
+    def test_non_async_scoring_algo(self):
+        def basic_scoring_algo(receptor: structure.Complex, ligand_comps: 'list[structure.Complex]'):
+            # Trivial scoring algorithm that returns valid output.
+            ligand_scores = []
+            for comp in ligand_comps:
+                comp_data = {
+                    'complex_index': comp.index,
+                    'aggregate_scores': [],
+                    'atom_scores': []
+                }
+                for atom in comp.atoms:
+                    comp_data['atom_scores'].append((atom.index, 1.0))
+                ligand_scores.append(comp_data)
+            return ligand_scores
+
+        async def validate_non_async_scoring_algo(self):
+            self.plugin.complex_cache = [self.receptor_comp, self.ligand_comp]
+            self.plugin.receptor_index = self.receptor_comp.index
+            RealtimeScoring.scoring_algorithm = basic_scoring_algo
+            self.plugin.ligand_residue_indices = [
+                res.index for res in self.ligand_comp.residues]
+            self.plugin.color_stream = MagicMock()
+            self.plugin.size_stream = MagicMock()
+            self.plugin.label_stream = MagicMock()
+            # Run function
+            self.plugin.settings.update_labels = True
+            await self.plugin.score_ligands()
+            # Assert stream updates were called
+            self.assertEqual(self.plugin.color_stream.update.call_count, 1)
+            self.assertEqual(self.plugin.size_stream.update.call_count, 1)
+            self.assertEqual(self.plugin.label_stream.update.call_count, 1)
+        run_awaitable(validate_non_async_scoring_algo, self)
+
     @staticmethod
     def generate_random_indices(comp):
         min_index = 1000000000
