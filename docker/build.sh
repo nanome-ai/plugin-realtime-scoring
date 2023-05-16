@@ -13,4 +13,4 @@ if [ ! -f ".cachebust" ] || (($cachebust)); then
 fi
 
 cachebust=`cat .cachebust`
-docker build -f Dockerfile --build-arg CACHEBUST=$cachebust -t realtime-scoring:major-update ..
+docker build -f Dockerfile --build-arg CACHEBUST=$cachebust -t realtime-scoring:latest ..
