@@ -18,8 +18,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.menu = MainMenu(self)
-        self.settings = SettingsMenu(self)
         self.last_update = datetime.now()
         self.is_updating = False
         # Configurable settings
@@ -32,6 +30,8 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         self.complex_cache = {}
 
     def start(self):
+        self.menu = MainMenu(self)
+        self.settings = SettingsMenu(self)
         # Update settings based on custom data added at runtime.
         custom_data = {}
         if self.custom_data:
@@ -52,7 +52,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         complex_list = await self.request_complex_list()
         comp_indices = set([comp.index for comp in complex_list])
         self.complex_cache = await self.request_complexes(comp_indices)
-        self.menu.render()
+        self.menu.render(force_enable=True)
 
     @async_callback
     async def update(self):

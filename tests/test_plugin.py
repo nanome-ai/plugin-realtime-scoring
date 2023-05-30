@@ -53,6 +53,7 @@ class RealtimeScoringTestCase(unittest.TestCase):
             original_version_table, custom_data, permissions
         )
         Process._manager = None
+        self.plugin.start()
 
     def test_setup_receptor_and_ligands(self):
         async def validate_setup_receptor_and_ligands(self):
