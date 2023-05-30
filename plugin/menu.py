@@ -1,6 +1,6 @@
 import nanome
 from os import path
-from nanome.api import ui, shapes
+from nanome.api import ui
 from nanome.util import Logs, async_callback
 from nanome.util.enums import NotificationTypes
 
