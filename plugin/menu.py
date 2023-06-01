@@ -139,11 +139,20 @@ class MainMenu:
             ml for i, ml in enumerate(receptor.molecules)
             if i == receptor.current_frame)
         ligands = await mol.get_ligands()
+        mol_size_is_1 = sum(1 for _ in mol.residues) == 1
+        ligand_count_is_1 = len(ligands) == 1
         # Create new button for every ligand.
         for lig in ligands:
+            # Molecules with 1 residue should use the residue name instead of ligand name
+            # Workaround for naming bug when ligand is split from receptor
+            if mol_size_is_1 and ligand_count_is_1:
+                ligand_name = next(lig.residues).name
+            else:
+                ligand_name = lig.name
+            residue = next(lig.residues)
             clone = self._pfb_complex.clone()
             btn = clone.get_content()
-            btn.text.value.set_all(lig.name)
+            btn.text.value.set_all(ligand_name)
             btn.index = receptor.index
             btn.residue_indices = [res.index for res in lig.residues]
             btn.extracted_ligand = True
