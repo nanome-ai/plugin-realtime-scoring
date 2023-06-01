@@ -27,7 +27,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
         # api structures
         self.receptor_index = None
         self.ligand_residue_indices = []
-        self.complex_cache = {}
+        self.complex_cache = []
 
     def start(self):
         self.menu = MainMenu(self)
@@ -338,4 +338,5 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     @async_callback
     async def on_complex_list_changed(self):
         comp_list = await self.request_complex_list()
-        await self.menu.render(comp_list)
+        self.complex_cache = await self.request_complexes([cmp.index for cmp in comp_list])
+        await self.menu.render()
