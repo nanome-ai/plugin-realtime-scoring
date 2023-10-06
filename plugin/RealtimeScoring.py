@@ -16,19 +16,6 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
 
     scoring_algorithm = scoring_algo.score_ligands
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.last_update = datetime.now()
-        self.is_updating = False
-        # Configurable settings
-        self.color_negative_score = Color(0, 0, 255, 200)  # Blue
-        self.color_positive_score = Color(255, 0, 0, 200)  # Red
-        self.realtime_enabled = True
-        # api structures
-        self.receptor_index = None
-        self.ligand_residue_indices = []
-        self.complex_cache = []
-
     def start(self):
         self.menu = MainMenu(self)
         self.settings = SettingsMenu(self)
@@ -40,12 +27,24 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
             except (IndexError, AttributeError):
                 pass
 
+        # Default configurable values
+        self.color_negative_score = Color(0, 0, 255, 200)  # Blue
+        self.color_positive_score = Color(255, 0, 0, 200)  # Red
+        self.realtime_enabled = True
+        # Configure settings based on custom data added at runtime.
         if custom_data.get('color_negative_score'):
             self.color_negative_score = custom_data.get('color_negative_score')
         if custom_data.get('color_positive_score'):
             self.color_positive_score = custom_data.get('color_positive_score')
         if custom_data.get('realtime_enabled'):
             self.realtime_enabled = custom_data.get('realtime_enabled')
+
+        self.last_update = datetime.now()
+        self.is_updating = False
+        # api structures
+        self.receptor_index = None
+        self.ligand_residue_indices = []
+        self.complex_cache = []
 
     @async_callback
     async def on_run(self):
