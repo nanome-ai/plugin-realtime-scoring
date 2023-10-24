@@ -32,7 +32,7 @@ class SettingsMenu():
 
     def open_menu(self):
         self._menu.enabled = True
-        self._menu.update_menu(self._menu)
+        self._plugin.update_menu(self._menu)
 
     @property
     def update_labels(self):
