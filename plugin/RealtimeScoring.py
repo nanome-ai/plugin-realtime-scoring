@@ -338,4 +338,7 @@ class RealtimeScoring(nanome.AsyncPluginInstance):
     async def on_complex_list_changed(self):
         comp_list = await self.request_complex_list()
         self.complex_cache = await self.request_complexes([cmp.index for cmp in comp_list])
+        if not isinstance(self.menu, MainMenu):
+            Logs.warning("self.menu somehow reverted back to default value. Reinitializing as MainMenu.")
+            self.menu = MainMenu(self)
         await self.menu.render()
