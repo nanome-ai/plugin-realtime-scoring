@@ -30,10 +30,9 @@ class SettingsMenu():
         self._btn_pcs.toggle_on_press = True
         self._btn_pcs.selected = False
 
-    def open_menu(self, menu=None):
-        self._plugin.menu = self._menu
-        self._plugin.menu.enabled = True
-        self._plugin.update_menu(self._plugin.menu)
+    def open_menu(self):
+        self._menu.enabled = True
+        self._plugin.update_menu(self._menu)
 
     @property
     def update_labels(self):
